@@ -5,7 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>내 대시보드</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<script>
+// 헬로키티 테마: 기본 켜짐, 선택은 브라우저에 기억
+try { document.documentElement.dataset.skin = localStorage.getItem("skin") || "kitty"; }
+catch (e) { document.documentElement.dataset.skin = "kitty"; }
+</script>
 <style>
 :root{
   --bg:#f5f6f8; --card:#fff; --text:#16181d; --sub:#6b7280; --line:#e6e8ec;
@@ -131,11 +136,57 @@ section.mkt{background:var(--card);border:1px solid var(--line);border-radius:14
 .note{font-size:12px;color:var(--sub);margin-top:12px;line-height:1.6}
 .soon{background:var(--card);border:1px dashed var(--line);border-radius:14px;padding:48px 16px;text-align:center;color:var(--sub)}
 .skel{height:300px;border-radius:14px;background:var(--card);border:1px solid var(--line);opacity:.6}
+/* 헬로키티 테마 */
+:root[data-skin="kitty"]{
+  --bg:#fff0f5; --card:#ffffff; --text:#4a2c3a; --sub:#a86b85; --line:#ffd1e1;
+  --up:#e8174f; --down:#3f7fe0; --flat:#a86b85; --accent:#ff4f8b; --chip:#ffe4ee; --open:#ff4f8b;
+  --s1:#ff4f8b; --s2:#e8174f; --s3:#4fb3e8; --grid:#ffe1ec; --axis:#c58aa3;
+  --dot:#ffd6e5; --shadow:0 4px 16px rgba(255,79,139,.12);
+}
+@media (prefers-color-scheme: dark){
+  :root[data-skin="kitty"]:not([data-theme="light"]){
+    --bg:#2a1620; --card:#3a1f2d; --text:#ffe8f0; --sub:#e3a3be; --line:#5a3044;
+    --up:#ff6b8f; --down:#7fb2ff; --flat:#e3a3be; --accent:#ff7aa8; --chip:#4a2738; --open:#ff7aa8;
+    --s1:#ff7aa8; --s2:#ff4d6d; --s3:#6cc4f0; --grid:#4a2738; --axis:#c48aa3;
+    --dot:#341b27; --shadow:0 4px 16px rgba(0,0,0,.3);
+  }
+}
+:root[data-skin="kitty"][data-theme="dark"]{
+  --bg:#2a1620; --card:#3a1f2d; --text:#ffe8f0; --sub:#e3a3be; --line:#5a3044;
+  --up:#ff6b8f; --down:#7fb2ff; --flat:#e3a3be; --accent:#ff7aa8; --chip:#4a2738; --open:#ff7aa8;
+  --s1:#ff7aa8; --s2:#ff4d6d; --s3:#6cc4f0; --grid:#4a2738; --axis:#c48aa3;
+  --dot:#341b27; --shadow:0 4px 16px rgba(0,0,0,.3);
+}
+[data-skin="kitty"] body{background-color:var(--bg);
+  background-image:radial-gradient(var(--dot) 18%,transparent 19%),radial-gradient(var(--dot) 18%,transparent 19%);
+  background-size:28px 28px;background-position:0 0,14px 14px}
+[data-skin="kitty"] header{background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(6px);
+  border-bottom:2px dashed var(--line)}
+[data-skin="kitty"] .top h1,[data-skin="kitty"] .mhead h2{font-family:"Jua","Noto Sans KR",sans-serif;font-weight:400;color:var(--accent)}
+[data-skin="kitty"] .top h1{font-size:22px;letter-spacing:0}
+[data-skin="kitty"] .mhead h2{font-size:19px}
+[data-skin="kitty"] nav button{font-family:"Jua","Noto Sans KR",sans-serif;font-weight:400;font-size:16px}
+[data-skin="kitty"] nav button.on{color:var(--accent);font-weight:400;border-bottom-width:3px}
+[data-skin="kitty"] section.mkt,[data-skin="kitty"] .breadth{border:2px solid var(--line);border-radius:22px;box-shadow:var(--shadow)}
+[data-skin="kitty"] section.mkt{position:relative}
+[data-skin="kitty"] section.mkt::after{content:"🎀";position:absolute;top:-12px;right:14px;font-size:22px;transform:rotate(12deg)}
+[data-skin="kitty"] .card{border-radius:18px;background:var(--card);transition:transform .15s}
+[data-skin="kitty"] .card:hover{transform:translateY(-2px)}
+[data-skin="kitty"] .filters button{border-width:2px}
+[data-skin="kitty"] .filters button.on{color:#fff}
+[data-skin="kitty"] .soon,[data-skin="kitty"] .skel{border-radius:22px}
+[data-skin="kitty"] .tip{border-radius:14px;border-width:2px}
+.kitty-face{display:none;width:30px;height:26px;vertical-align:-4px;margin-right:6px}
+[data-skin="kitty"] .kitty-face{display:inline-block}
+.skin-btn{border:1px solid var(--line);background:var(--card);color:var(--sub);font:inherit;font-size:12px;
+  padding:4px 10px;border-radius:999px;cursor:pointer;flex:none}
+[data-skin="kitty"] .skin-btn{border-width:2px;color:var(--accent);font-weight:500}
+.top .right{display:flex;align-items:center;gap:10px}
 </style>
 </head>
 <body>
 <header>
-  <div class="top"><h1>내 대시보드</h1><span class="upd" id="upd">불러오는 중…</span></div>
+  <div class="top"><h1><svg class="kitty-face" viewBox="0 0 60 52" aria-hidden="true"><path d="M8 20 L6 4 L20 13 Z M52 20 L54 4 L40 13 Z" fill="#fff" stroke="#4a2c3a" stroke-width="2.5" stroke-linejoin="round"/><ellipse cx="30" cy="30" rx="25" ry="19" fill="#fff" stroke="#4a2c3a" stroke-width="2.5"/><ellipse cx="20" cy="31" rx="2.6" ry="3.4" fill="#4a2c3a"/><ellipse cx="40" cy="31" rx="2.6" ry="3.4" fill="#4a2c3a"/><ellipse cx="30" cy="36" rx="3" ry="2.2" fill="#ffd34d" stroke="#4a2c3a" stroke-width="1.2"/><path d="M3 30h9M3 35l9-2M57 30h-9M57 35l-9-2" stroke="#4a2c3a" stroke-width="2" stroke-linecap="round"/><g transform="translate(44 12) rotate(15)"><path d="M0 0 L-11 -8 L-11 8 Z M0 0 L11 -8 L11 8 Z" fill="#ff2d6f" stroke="#4a2c3a" stroke-width="1.5" stroke-linejoin="round"/><circle r="4" fill="#ff2d6f" stroke="#4a2c3a" stroke-width="1.5"/></g></svg>내 대시보드</h1><div class="right"><span class="upd" id="upd">불러오는 중…</span><button class="skin-btn" id="skin">🎀 키티</button></div></div>
   <nav id="tabs">
     <button data-tab="market" class="on">국장·미장</button>
     <button data-tab="newhigh">신고가</button>
@@ -181,6 +232,16 @@ section.mkt{background:var(--card);border:1px solid var(--line);border-radius:14
 </main>
 <script>
 const $ = s => document.querySelector(s);
+
+// 테마 전환 (헬로키티 ↔ 기본)
+const skinLabel = () => $("#skin").textContent = document.documentElement.dataset.skin === "kitty" ? "기본 테마" : "🎀 키티 테마";
+$("#skin").onclick = () => {
+  const next = document.documentElement.dataset.skin === "kitty" ? "basic" : "kitty";
+  document.documentElement.dataset.skin = next;
+  try { localStorage.setItem("skin", next); } catch (e) {}
+  skinLabel();
+};
+skinLabel();
 
 // 탭 전환
 document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => {
