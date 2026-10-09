@@ -64,6 +64,8 @@ section.mkt{background:var(--card);border:1px solid var(--line);border-radius:14
 .card .p{font-size:20px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
 .card .c{font-size:13px;font-weight:500;margin-top:2px;font-variant-numeric:tabular-nums}
 .card svg{display:block;width:100%;height:34px;margin-top:8px}
+a.card{display:block;color:inherit;text-decoration:none}
+a.card:hover{background:var(--chip)}
 .sub{font-size:13px;color:var(--sub);font-weight:500;margin:16px 0 6px}
 .rows .row{display:flex;align-items:center;gap:10px;padding:10px 2px;border-top:1px solid var(--line)}
 .rows .row:first-child{border-top:0}
@@ -273,13 +275,25 @@ function spark(arr, cls) {
     stroke="currentColor" stroke-width="1.6" vector-effect="non-scaling-stroke" class="${cls}" stroke-linejoin="round"/></svg>`;
 }
 
+// 지수 카드 → 네이버 증권 페이지
+const NAVER_LINK = {
+  "^KS11": "domestic/index/KOSPI/total", "^KQ11": "domestic/index/KOSDAQ/total",
+  "KRW=X": "marketindex/exchange/FX_USDKRW",
+  "^GSPC": "worldstock/index/.INX/total", "^IXIC": "worldstock/index/.IXIC/total",
+  "^DJI": "worldstock/index/.DJI/total", "^SOX": "worldstock/index/.SOX/total",
+  "NQ=F": "worldstock/index/NQcv1/total", "^VIX": "worldstock/index/.VIX/total",
+};
+
 function card(q) {
-  if (q.error) return `<div class="card"><div class="n">${q.name}</div><div class="err">불러오기 실패</div></div>`;
+  const path = NAVER_LINK[q.symbol];
+  const open = path ? `<a class="card" href="https://m.stock.naver.com/${path}" target="_blank" rel="noopener">` : `<div class="card">`;
+  const close = path ? "</a>" : "</div>";
+  if (q.error) return `${open}<div class="n">${q.name}</div><div class="err">불러오기 실패</div>${close}`;
   const c = dir(q.change);
-  return `<div class="card"><div class="n">${q.name}</div>
+  return `${open}<div class="n">${q.name}</div>
     <div class="p">${fmt(q, q.price)}</div>
     <div class="c ${c}">${arrow(q.change)} ${fmt(q, Math.abs(q.change))} (${q.pct >= 0 ? "+" : ""}${q.pct.toFixed(2)}%)</div>
-    <div class="${c}">${spark(q.spark, "")}</div></div>`;
+    <div class="${c}">${spark(q.spark, "")}</div>${close}`;
 }
 
 function row(q) {
