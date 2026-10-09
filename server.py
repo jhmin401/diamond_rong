@@ -112,7 +112,7 @@ def new_highs():
 
 
 _news_cache = {"at": 0, "data": None}
-NEWS_API = "https://m.stock.naver.com/front-api/news/category?category={}&page=1&pageSize={}"
+NEWS_API = "https://m.stock.naver.com/front-api/news/category?category={}&page={}&pageSize=20"
 # 실시간 뉴스 중에서 이 말머리가 붙은 것만 '속보'로 남긴다
 FLASH_TAGS = ("속보", "긴급", "1보", "단독")
 
@@ -122,10 +122,14 @@ def news():
     if _news_cache["data"] and time.time() - _news_cache["at"] < CACHE_SEC:
         return _news_cache["data"]
 
-    def get(category, size):
-        req = urllib.request.Request(NEWS_API.format(category, size), headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=15) as r:
-            return json.loads(r.read()).get("result") or []
+    def get(category, pages):
+        # 한 번에 많이 달라고 하면 400이 나서 20건씩 나눠 받는다
+        out = []
+        for page in range(1, pages + 1):
+            req = urllib.request.Request(NEWS_API.format(category, page), headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                out += json.loads(r.read()).get("result") or []
+        return out
 
     def item(it, kind):
         dt = it.get("datetime", "")
@@ -137,11 +141,11 @@ def news():
         }
 
     items = {}
-    for it in get("flashnews", 100):
+    for it in get("flashnews", 5):
         head = (it.get("titleFull") or it.get("title") or "")[:12]
         if any(t in head for t in FLASH_TAGS):
             items[it["articleId"]] = item(it, "flash")
-    for it in get("mainnews", 30):
+    for it in get("mainnews", 1):
         items.setdefault(it["articleId"], item(it, "main"))
     data = {"items": sorted(items.values(), key=lambda x: x["time"] or "", reverse=True),
             "updated": int(time.time())}
