@@ -2,7 +2,7 @@
 
 http://localhost:8080 (같은 와이파이의 폰: http://PC주소:8080)
   /             화면 (index.html)
-  /data/*.json  시세·신고가·매크로·추정치 JSON (GitHub Pages와 같은 주소)
+  /data/*.json  시세·신고가·매크로·뉴스·추정치 JSON (GitHub Pages와 같은 주소)
 """
 import json
 import time
@@ -111,6 +111,44 @@ def new_highs():
     return data
 
 
+_news_cache = {"at": 0, "data": None}
+NEWS_API = "https://m.stock.naver.com/front-api/news/category?category={}&page=1&pageSize={}"
+# 실시간 뉴스 중에서 이 말머리가 붙은 것만 '속보'로 남긴다
+FLASH_TAGS = ("속보", "긴급", "1보", "단독")
+
+
+def news():
+    """네이버 증권 주요뉴스 + 실시간 뉴스 중 속보만."""
+    if _news_cache["data"] and time.time() - _news_cache["at"] < CACHE_SEC:
+        return _news_cache["data"]
+
+    def get(category, size):
+        req = urllib.request.Request(NEWS_API.format(category, size), headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return json.loads(r.read()).get("result") or []
+
+    def item(it, kind):
+        dt = it.get("datetime", "")
+        return {
+            "kind": kind, "title": it.get("titleFull") or it.get("title"), "press": it.get("officeName"),
+            "time": f"{dt[:4]}-{dt[4:6]}-{dt[6:8]}T{dt[8:10]}:{dt[10:12]}:{dt[12:14]}+09:00" if len(dt) >= 14 else None,
+            "url": f"https://n.news.naver.com/mnews/article/{it.get('officeId')}/{it.get('articleId')}",
+            "summary": (it.get("body") or "").strip(),
+        }
+
+    items = {}
+    for it in get("flashnews", 100):
+        head = (it.get("titleFull") or it.get("title") or "")[:12]
+        if any(t in head for t in FLASH_TAGS):
+            items[it["articleId"]] = item(it, "flash")
+    for it in get("mainnews", 30):
+        items.setdefault(it["articleId"], item(it, "main"))
+    data = {"items": sorted(items.values(), key=lambda x: x["time"] or "", reverse=True),
+            "updated": int(time.time())}
+    _news_cache.update(at=time.time(), data=data)
+    return data
+
+
 NAVER = "https://stock.naver.com/api/securityService/marketindex"
 # (그룹, 이름, 네이버 종류, 로이터 코드)
 MACRO = [
@@ -207,6 +245,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.path = self.path[len(PREFIX):]
         # GitHub Pages와 같은 주소(data/*.json)로 내 PC에서도 바로 데이터를 준다
         api = {"/data/market.json": market, "/data/newhigh.json": new_highs, "/data/macro.json": macro,
+               "/data/news.json": news,
                "/data/estimates.json": estimates_data}.get(self.path.split("?")[0])
         if api:
             try:

@@ -24,7 +24,8 @@ def main():
     (OUT / "data").mkdir(parents=True, exist_ok=True)
     shutil.copy(BASE / "index.html", OUT / "index.html")
 
-    for name, fn in [("market", server.market), ("newhigh", server.new_highs), ("macro", server.macro)]:
+    for name, fn in [("market", server.market), ("newhigh", server.new_highs), ("macro", server.macro),
+                     ("news", server.news)]:
         try:
             write(OUT / "data" / f"{name}.json", fn())
             print(f"{name}: OK")
