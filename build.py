@@ -27,8 +27,13 @@ def main():
     for name, fn in [("market", server.market), ("newhigh", server.new_highs), ("macro", server.macro),
                      ("news", server.news)]:
         try:
-            write(OUT / "data" / f"{name}.json", fn())
-            print(f"{name}: OK")
+            data = fn()
+            write(OUT / "data" / f"{name}.json", data)
+            if name == "newhigh":
+                # Actions 로그에서 걸러지기 전/후 종목 수를 바로 확인할 수 있게
+                print(f"{name}: OK (네이버 {data['raw']}종목 → 신고가 {len(data['stocks'])}종목)")
+            else:
+                print(f"{name}: OK")
         except Exception as e:
             print(f"{name}: 실패 {e}")
 

@@ -98,6 +98,9 @@ def new_highs():
         "high52": num(it.get("week52HighPrice")), "amount": num(it.get("tradeAmount")),
         "cap": num(it.get("marketSum")),
     } for it in items]
+    raw = len(stocks)
+    # 네이버가 준 순서만 믿지 않고, 오늘 고가가 52주 최고가에 닿은 종목만 남긴다
+    stocks = [s for s in stocks if s["high"] and s["high52"] and s["high"] >= s["high52"]]
     # upDownGb 4(하한)·5(하락)인데 변동폭이 양수로 오면 부호를 맞춘다
     signs = {it["itemcode"]: it.get("upDownGb") for it in items}
     for s in stocks:
@@ -106,7 +109,7 @@ def new_highs():
             if s["pct"] and s["pct"] > 0:
                 s["pct"] = -s["pct"]
     stocks.sort(key=lambda s: s["pct"] or 0, reverse=True)
-    data = {"stocks": stocks, "updated": int(time.time())}
+    data = {"stocks": stocks, "raw": raw, "updated": int(time.time())}
     _high_cache.update(at=time.time(), data=data)
     return data
 
