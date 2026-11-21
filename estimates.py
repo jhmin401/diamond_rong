@@ -17,7 +17,8 @@ OUT = BASE / "estimates.json"
 UNIVERSE = 400  # 시가총액 상위 몇 종목까지 볼지
 WORKERS = 4     # 동시에 보내는 요청 수 (너무 늘리지 말 것)
 MIN_OK = 0.8    # 요청이 이 비율 이상 성공해야 저장한다
-CHECK_AFTER = 40  # 이만큼 요청한 뒤부터 차단 여부를 판단한다
+CHECK_AFTER = 80  # 이만큼 요청한 뒤부터 차단 여부를 판단한다
+TIMEOUT = 8      # 요청 하나를 기다리는 시간(초). 정상 응답은 1초 안에 온다
 
 WISE = "https://navercomp.wisereport.co.kr/v2/company"
 # 추정치 표의 항목 코드 → 이름
@@ -28,7 +29,7 @@ def get_json(url, referer=None):
     headers = {"User-Agent": "Mozilla/5.0"}
     if referer:
         headers["Referer"] = referer
-    with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=20) as r:
+    with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=TIMEOUT) as r:
         return json.loads(r.read())
 
 
@@ -85,13 +86,15 @@ def collect():
     prev = previous()
     lock = threading.Lock()
     tried = failed = 0
+    # 이만큼 실패하면 어차피 저장하지 않으므로 더 요청할 필요가 없다
+    max_fail = len(stocks) * len(years) * (1 - MIN_OK)
 
     def one(s):
         nonlocal tried, failed
         for y in years:
             with lock:
-                # 처음 몇십 건부터 절반 넘게 실패하면 막힌 것으로 보고 나머지는 요청하지 않는다
-                blocked = tried >= CHECK_AFTER and failed > tried * 0.5
+                # 저장 못 할 만큼 실패했거나, 초반부터 30% 넘게 실패하면 막힌 것으로 보고 멈춘다
+                blocked = failed > max_fail or (tried >= CHECK_AFTER and failed > tried * 0.3)
             if blocked:
                 ok = False
             else:
