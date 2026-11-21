@@ -5,6 +5,7 @@
 하루 한 번이면 충분하다 (server.py가 알아서 돌린다).
 """
 import json
+import threading
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -15,6 +16,8 @@ BASE = Path(__file__).resolve().parent
 OUT = BASE / "estimates.json"
 UNIVERSE = 400  # 시가총액 상위 몇 종목까지 볼지
 WORKERS = 4     # 동시에 보내는 요청 수 (너무 늘리지 말 것)
+MIN_OK = 0.8    # 요청이 이 비율 이상 성공해야 저장한다
+CHECK_AFTER = 40  # 이만큼 요청한 뒤부터 차단 여부를 판단한다
 
 WISE = "https://navercomp.wisereport.co.kr/v2/company"
 # 추정치 표의 항목 코드 → 이름
@@ -62,22 +65,54 @@ def consensus(code, yymm):
     return vals
 
 
+def previous():
+    """지난번 저장한 값 (종목코드 → 종목). 실패한 종목을 채우는 데 쓴다."""
+    try:
+        return {s["code"]: s for s in json.loads(OUT.read_text(encoding="utf-8"))["stocks"]}
+    except Exception:
+        return {}
+
+
 def collect():
+    """수집해서 estimates.json에 저장한다.
+
+    요청이 너무 많이 실패하면(차단·지연) 저장하지 않고 예외를 던진다.
+    그러면 기존 파일이 그대로 남고, 다음 실행 때 다시 시도한다.
+    """
     year = datetime.now().year
     years = [f"{year}12", f"{year + 1}12"]
     stocks = universe()
+    prev = previous()
+    lock = threading.Lock()
+    tried = failed = 0
 
     def one(s):
+        nonlocal tried, failed
         for y in years:
-            try:
-                s[y] = consensus(s["code"], y)
-            except Exception:
-                s[y] = {}
-            time.sleep(0.2)
+            with lock:
+                # 처음 몇십 건부터 절반 넘게 실패하면 막힌 것으로 보고 나머지는 요청하지 않는다
+                blocked = tried >= CHECK_AFTER and failed > tried * 0.5
+            if blocked:
+                ok = False
+            else:
+                try:
+                    s[y] = consensus(s["code"], y)
+                    ok = True
+                except Exception:
+                    ok = False
+                time.sleep(0.2)
+            with lock:
+                tried += 1
+                failed += not ok
+            if not ok:
+                # 실패한 종목은 지난번 값으로 채운다
+                s[y] = prev.get(s["code"], {}).get(y, {})
         return s
 
     with ThreadPoolExecutor(WORKERS) as ex:
         stocks = list(ex.map(one, stocks))
+    if failed > tried * (1 - MIN_OK):
+        raise RuntimeError(f"요청 {tried}건 중 {failed}건 실패, 저장하지 않음")
     data = {"updated": int(time.time()), "years": years,
             "stocks": [s for s in stocks if any(s.get(y) for y in years)]}
     tmp = OUT.with_suffix(".tmp")
