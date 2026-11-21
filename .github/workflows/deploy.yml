@@ -20,9 +20,6 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -49,5 +46,15 @@ jobs:
         with:
           path: public
 
+  # 배포는 별도 job으로 한다 (GitHub Pages 기본 템플릿 구조).
+  # 업로드 직후 같은 job에서 배포하면 GitHub가 방금 올린 파일을 아직 못 찾아
+  # "No artifacts named github-pages" 오류가 나는 경우가 있었다.
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
       - id: deploy
         uses: actions/deploy-pages@v4
