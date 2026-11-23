@@ -209,18 +209,112 @@ def dart_day(day):
     return out
 
 
+def naver_api(path):
+    return json.loads(get("https://m.stock.naver.com/api" + path))
+
+
+def signed(v):
+    try:
+        return int(str(v).replace(",", "").replace("+", ""))
+    except (TypeError, ValueError):
+        return None
+
+
+FLOW_DAYS = 20
+
+
+def kr_flows(dates):
+    """코스피·코스닥 투자자별 순매수(억원) 최근 거래일들과 오늘 프로그램 매매."""
+    jobs = [(mk, d) for mk in ("KOSPI", "KOSDAQ") for d in dates]
+
+    def one(j):
+        try:
+            r = naver_api(f"/index/{j[0]}/trend?bizdate={j[1].replace('-', '')}")
+            return j, {"d": j[1], "ind": signed(r.get("personalValue")), "frg": signed(r.get("foreignValue")),
+                       "inst": signed(r.get("institutionalValue")), "bd": r.get("bizdate")}
+        except Exception:
+            return j, None
+
+    def program(mk):
+        try:
+            p = naver_api(f"/index/{mk}/integration").get("programTrendInfo") or {}
+            return {"d": p.get("bizdate"), "arb": signed(p.get("indexDifferenceReal")),
+                    "nonarb": signed(p.get("indexBiDifferenceReal")), "total": signed(p.get("indexTotalReal"))}
+        except Exception:
+            return None
+
+    with ThreadPoolExecutor(10) as ex:
+        res = list(ex.map(one, jobs))
+        prog = dict(zip(("kospi", "kosdaq"), ex.map(program, ("KOSPI", "KOSDAQ"))))
+    out = {"kospi": [], "kosdaq": [], "program": prog}
+    for (mk, d), r in res:
+        # 요청한 날짜와 다른 날 값이 오거나(아직 집계 전) 모두 0이면(휴장) 뺀다
+        if not r or r["bd"] != d.replace("-", "") or not any(r[k] for k in ("ind", "frg", "inst")):
+            continue
+        del r["bd"]
+        out[mk.lower()].append(r)
+    return out
+
+
+def kr_sectors():
+    """네이버 업종별 등락과 업종에 속한 종목 [코드, 이름, 시장(0·1), 등락률, 시총(억)]."""
+    groups = naver_api("/stocks/industry?page=1&pageSize=100")["groups"]
+    jobs = [(g["no"], p) for g in groups for p in range(1, (g["totalCount"] - 1) // 100 + 2)]
+
+    def one(j):
+        try:
+            return j[0], naver_api(f"/stocks/industry/{j[0]}?page={j[1]}&pageSize=100")["stocks"]
+        except Exception:
+            return j[0], []
+
+    with ThreadPoolExecutor(8) as ex:
+        res = list(ex.map(one, jobs))
+    members = {}
+    for no, stocks in res:
+        for it in stocks:
+            if it.get("stockEndType") != "stock" or it.get("sosok") not in ("0", "1"):
+                continue
+            try:
+                pct = float(it.get("fluctuationsRatio"))
+            except (TypeError, ValueError):
+                pct = None
+            members.setdefault(no, []).append([it["itemCode"], it["stockName"], int(it["sosok"]), pct, signed(it.get("marketValue"))])
+    out = []
+    for g in groups:
+        ms = sorted(members.get(g["no"], []), key=lambda m: -(m[4] or 0))
+        try:
+            pct = float(g["changeRate"])
+        except (TypeError, ValueError):
+            pct = None
+        out.append({"no": g["no"], "nm": g["name"], "pct": pct, "up": g.get("riseCount"), "dn": g.get("fallCount"),
+                    "fl": g.get("steadyCount"), "cap": sum(m[4] or 0 for m in ms), "stocks": ms})
+    out.sort(key=lambda x: -(x["pct"] or 0))
+    return out
+
+
 def kr_board():
-    """국장 탭: 코스피·코스닥 차트와 오늘의 공시."""
-    with ThreadPoolExecutor(2) as ex:
+    """국장 탭: 코스피·코스닥 차트, 투자자별 수급, 업종별 등락, 오늘의 공시."""
+    with ThreadPoolExecutor(3) as ex:
+        sectors = ex.submit(kr_sectors)
         charts = dict(zip(["kospi", "kosdaq"], ex.map(index_chart, ["^KS11", "^KQ11"])))
-    # 주말·휴일이면 공시가 있는 가장 최근 날로
-    disc, day = [], None
-    for back in range(0, 5):
-        day = time.strftime("%Y-%m-%d", time.gmtime(time.time() + 9 * 3600 - back * 86400))
-        disc = dart_day(day)
-        if disc:
-            break
-    return {"charts": charts, "disc": {"day": day, "items": disc}, "updated": int(time.time())}
+        # 수급은 코스피 일봉에 나온 최근 거래일들로 묻는다
+        dates = [d for d, _ in charts["kospi"]["year"]][-FLOW_DAYS:]
+        flows = ex.submit(kr_flows, dates)
+        # 주말·휴일이면 공시가 있는 가장 최근 날로
+        disc, day = [], None
+        for back in range(0, 5):
+            day = time.strftime("%Y-%m-%d", time.gmtime(time.time() + 9 * 3600 - back * 86400))
+            disc = dart_day(day)
+            if disc:
+                break
+        data = {"charts": charts, "disc": {"day": day, "items": disc}, "updated": int(time.time())}
+        for key, fut in (("flows", flows), ("sectors", sectors)):
+            try:
+                data[key] = fut.result()
+            except Exception as e:
+                data[key] = None
+                print(f"kr {key}: 실패 {e}")
+    return data
 
 
 
