@@ -5,6 +5,7 @@ GitHub Actions가 15분마다 이 파일을 실행해서 사이트를 갱신한�
 추정치(estimates.json)는 20시간보다 오래됐거나 종목이 너무 적을 때만 새로 모은다.
 """
 import json
+import os
 import shutil
 import time
 from pathlib import Path
@@ -18,6 +19,22 @@ OUT = BASE / "public"
 
 def write(path, data):
     path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+
+
+def keep_live(name):
+    """GitHub Pages에 올라가 있는 data/<name>.json을 받아 public에 그대로 둔다."""
+    repo = os.environ.get("GITHUB_REPOSITORY", "")
+    if "/" not in repo:
+        return False
+    owner, proj = repo.split("/", 1)
+    url = f"https://{owner.lower()}.github.io/{proj}/data/{name}.json?t={int(time.time())}"
+    try:
+        body = server.get(url, timeout=20)
+        json.loads(body)  # 깨진 파일은 올리지 않는다
+        (OUT / "data" / f"{name}.json").write_bytes(body)
+        return True
+    except Exception:
+        return False
 
 
 def main():
@@ -48,7 +65,8 @@ def main():
             write(OUT / "data" / f"{name}.json", fn())
             print(f"{name}: OK")
         except Exception as e:
-            print(f"{name}: 실패 {e}")
+            # 실패하면 지금 사이트에 올라가 있는 파일을 그대로 다시 올린다 (파일이 사라져 화면이 비지 않게)
+            print(f"{name}: 실패 {e} → 기존 파일 유지 {'성공' if keep_live(name) else '실패'}")
 
 
 if __name__ == "__main__":
