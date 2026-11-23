@@ -66,15 +66,6 @@ section.mkt{background:var(--card);border:1px solid var(--line);border-radius:14
 .card svg{display:block;width:100%;height:34px;margin-top:8px}
 a.card{display:block;color:inherit;text-decoration:none}
 a.card:hover{background:var(--chip)}
-.sub{font-size:13px;color:var(--sub);font-weight:500;margin:16px 0 6px}
-.rows .row{display:flex;align-items:center;gap:10px;padding:10px 2px;border-top:1px solid var(--line)}
-.rows .row:first-child{border-top:0}
-.row .n{flex:1;min-width:0;font-weight:500}
-.row .n small{display:block;font-size:11px;color:var(--sub);font-weight:400}
-.row svg{width:70px;height:26px;flex:none}
-.row .r{text-align:right;font-variant-numeric:tabular-nums;min-width:92px}
-.row .r b{display:block;font-weight:700}
-.row .r span{font-size:13px}
 .up{color:var(--up)} .down{color:var(--down)} .flat{color:var(--flat)}
 .err{color:var(--sub);font-size:13px}
 .filters{display:flex;gap:6px;margin-bottom:8px}
@@ -203,7 +194,6 @@ a.card:hover{background:var(--chip)}
   <nav id="tabs">
     <button data-tab="market" class="on">국장·미장</button>
     <button data-tab="newhigh">신고가</button>
-    <button data-tab="watch">관심종목</button>
     <button data-tab="macro">매크로</button>
     <button data-tab="news">주요뉴스</button>
     <button data-tab="estimate">추정치</button>
@@ -251,7 +241,6 @@ a.card:hover{background:var(--chip)}
     <div class="cols" id="es-body"><div class="skel"></div><div class="skel"></div></div>
     <p class="note" id="es-note"></p>
   </div>
-  <div id="tab-other" hidden><div class="soon">이 탭은 곧 만들어요 🛠</div></div>
 </main>
 <script>
 const $ = s => document.querySelector(s);
@@ -271,7 +260,6 @@ document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => {
   document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x === b));
   const tab = b.dataset.tab, built = ["market", "newhigh", "macro", "news", "estimate"];
   for (const t of built) $("#tab-" + t).hidden = t !== tab;
-  $("#tab-other").hidden = built.includes(tab);
   if (tab === "newhigh") loadHighs();
   if (tab === "macro") loadMacro();
   if (tab === "news") loadNews();
@@ -318,15 +306,6 @@ function card(q) {
     <div class="${c}">${spark(q.spark, "")}</div>${close}`;
 }
 
-function row(q) {
-  if (q.error) return `<div class="row"><div class="n">${q.name}</div><div class="err">불러오기 실패</div></div>`;
-  const c = dir(q.change);
-  const unit = q.currency === "USD" ? "$" : "";
-  return `<div class="row"><div class="n">${q.name}<small>${q.symbol}</small></div>
-    <span class="${c}">${spark(q.spark, "")}</span>
-    <div class="r"><b>${unit}${fmt(q, q.price)}</b><span class="${c}">${q.pct >= 0 ? "+" : ""}${q.pct.toFixed(2)}%</span></div></div>`;
-}
-
 function status(q) {
   const now = Date.now() / 1000;
   const live = q && q.open && now >= q.open && now <= q.close;
@@ -337,21 +316,19 @@ function status(q) {
   };
 }
 
-function market(title, idx, stocks, ref) {
+function market(title, idx, ref) {
   const s = status(ref);
   return `<section class="mkt">
     <div class="mhead"><h2>${title}</h2>${s.badge}<span class="hours">${s.hours}</span></div>
-    <div class="grid">${idx.map(card).join("")}</div>
-    <div class="sub">관심 종목</div>
-    <div class="rows">${stocks.map(row).join("")}</div></section>`;
+    <div class="grid">${idx.map(card).join("")}</div></section>`;
 }
 
 async function load() {
   try {
     const d = await (await fetch("data/market.json", {cache: "no-store"})).json();
     $("#tab-market").innerHTML = `<div class="cols">
-      ${market("국장", d.kr_index, d.kr_stock, d.kr_index[0])}
-      ${market("미장", d.us_index, d.us_stock, d.us_index[0])}</div>`;
+      ${market("국장", d.kr_index, d.kr_index[0])}
+      ${market("미장", d.us_index, d.us_index[0])}</div>`;
     $("#upd").textContent = "업데이트 " + new Date(d.updated * 1000).toLocaleTimeString("ko-KR", {hour12: false});
   } catch (e) {
     $("#upd").textContent = "연결 실패 · 다시 시도 중";
