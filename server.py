@@ -2,7 +2,7 @@
 
 http://localhost:8080 (같은 와이파이의 폰: http://PC주소:8080)
   /             화면 (index.html)
-  /data/*.json  시세·신고가·매크로·뉴스·추정치 JSON (GitHub Pages와 같은 주소)
+  /data/*.json  시세·신고가·매크로·뉴스·추정치·국장(차트·공시)·종목 JSON (GitHub Pages와 같은 주소)
 """
 import json
 import time
@@ -107,6 +107,120 @@ def new_highs():
     data = {"stocks": stocks, "updated": int(time.time())}
     _high_cache.update(at=time.time(), data=data)
     return data
+
+
+def get(url, data=None, timeout=20):
+    body = urllib.parse.urlencode(data).encode() if data else None
+    req = urllib.request.Request(url, data=body, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read()
+
+
+_stocks_cache = {"at": 0, "data": None}
+
+
+def stocks():
+    """국장 전 종목 (종목검색용). 한 종목 = [코드, 이름, 시장(0 코스피·1 코스닥), 현재가, 등락률,
+    시총(억), 거래대금(억), PER, PBR, 52주 최고, 52주 최저, 외국인 비율]."""
+    if _stocks_cache["data"] and time.time() - _stocks_cache["at"] < CACHE_SEC:
+        return _stocks_cache["data"]
+    items = json.loads(get("https://stock.naver.com/api/domestic/market/stock/default?tradeType=KRX"
+                           "&marketType=ALL&orderType=marketSum&startIdx=0&pageSize=5000"))
+
+    def f(v, nd=2):
+        try:
+            return round(float(v), nd)
+        except (TypeError, ValueError):
+            return None
+
+    rows = []
+    for it in items:
+        if it.get("sosok") not in ("0", "1"):
+            continue  # 코넥스 제외
+        pct = f(it.get("prevChangeRate"))
+        if it.get("upDownGb") in ("4", "5") and pct and pct > 0:
+            pct = -pct
+        cap, amt = f(it.get("marketSum"), 0), f(it.get("tradeAmount"), 0)
+        rows.append([it["itemcode"], it["itemname"], int(it["sosok"]), f(it.get("nowPrice"), 0), pct,
+                     round(cap / 1e8) if cap else None, round(amt / 1e8) if amt else None,
+                     f(it.get("per")), f(it.get("pbr")), f(it.get("week52HighPrice"), 0),
+                     f(it.get("week52LowPrice"), 0), f(it.get("frgnHoldRate"))])
+    data = {"rows": rows, "updated": int(time.time())}
+    _stocks_cache.update(at=time.time(), data=data)
+    return data
+
+
+def yahoo_points(symbol, rng, interval):
+    url = (f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(symbol)}"
+           f"?range={rng}&interval={interval}")
+    res = json.loads(get(url))["chart"]["result"][0]
+    closes = res["indicators"]["quote"][0]["close"]
+    pts = [(t, round(c, 2)) for t, c in zip(res.get("timestamp") or [], closes) if c is not None]
+    return pts, res["meta"].get("chartPreviousClose")
+
+
+def index_chart(symbol):
+    """지수 차트: 당일 5분봉(한국시간 HH:MM)과 1년 일봉(YYYY-MM-DD)."""
+    kst = lambda t, fmt: time.strftime(fmt, time.gmtime(t + 9 * 3600))
+    day, prev = yahoo_points(symbol, "1d", "5m")
+    year, _ = yahoo_points(symbol, "1y", "1d")
+    return {"prev": prev, "day": [(kst(t, "%H:%M"), v) for t, v in day],
+            "year": [(kst(t, "%Y-%m-%d"), v) for t, v in year]}
+
+
+# 공시 분류 (제목에 이 말이 들어가면)
+DISC_CATS = [
+    ("실적", ("잠정)실적", "잠정실적", "결산실적", "매출액또는손익구조")),
+    ("계약", ("공급계약", "단일판매", "수주")),
+    ("주주환원", ("자기주식", "배당", "소각", "무상증자")),
+    ("자금조달", ("유상증자", "전환사채", "신주인수권", "교환사채", "사채권")),
+    ("지분", ("대량보유", "임원ㆍ주요주주", "최대주주")),
+]
+
+
+def dart_day(day):
+    """DART '오늘의 공시'에서 그날 유가·코스닥 공시를 모두 가져온다 (최신순)."""
+    import html as htmllib
+    import re
+    out = []
+    for group, mkt in (("Y", "코스피"), ("K", "코스닥")):
+        for page in range(1, 20):
+            h = get("https://dart.fss.or.kr/dsac001/search.ax", {
+                "currentPage": page, "maxResults": 100, "maxLinks": 10, "pageGrouping": group,
+                "mdayCnt": 0, "selectDate": day.replace("-", ".")}).decode("utf-8")
+            rows = re.findall(r"<tr>(.*?)</tr>", h, re.S)
+            got = 0
+            for r in rows:
+                m = re.search(r"openReportViewer\('(\d+)'\)[^>]*>(.*?)</a>", r, re.S)
+                if not m:
+                    continue
+                cells = re.findall(r"<td[^>]*>(.*?)</td>", r, re.S)
+                text = lambda s: re.sub(r"\s+", " ", htmllib.unescape(re.sub(r"<[^>]+>", " ", s))).strip()
+                corp = re.search(r"openCorpInfoNew[^>]*>(.*?)</a>", r, re.S)
+                title = text(m.group(2))
+                out.append({"t": text(cells[0]), "m": mkt, "nm": text(corp.group(1)) if corp else "",
+                            "title": title, "id": m.group(1),
+                            "cat": next((c for c, kws in DISC_CATS if any(k in title for k in kws)), "기타")})
+                got += 1
+            total = re.search(r'id="totalCnt" value="(\d+)"', h)
+            if got < 100 or (total and page * 100 >= int(total.group(1))):
+                break
+    out.sort(key=lambda d: (d["t"], d["id"]), reverse=True)
+    return out
+
+
+def kr_board():
+    """국장 탭: 코스피·코스닥 차트와 오늘의 공시."""
+    with ThreadPoolExecutor(2) as ex:
+        charts = dict(zip(["kospi", "kosdaq"], ex.map(index_chart, ["^KS11", "^KQ11"])))
+    # 주말·휴일이면 공시가 있는 가장 최근 날로
+    disc, day = [], None
+    for back in range(0, 5):
+        day = time.strftime("%Y-%m-%d", time.gmtime(time.time() + 9 * 3600 - back * 86400))
+        disc = dart_day(day)
+        if disc:
+            break
+    return {"charts": charts, "disc": {"day": day, "items": disc}, "updated": int(time.time())}
 
 
 _news_cache = {"at": 0, "data": None}
@@ -247,7 +361,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.path = self.path[len(PREFIX):]
         # GitHub Pages와 같은 주소(data/*.json)로 내 PC에서도 바로 데이터를 준다
         api = {"/data/market.json": market, "/data/newhigh.json": new_highs, "/data/macro.json": macro,
-               "/data/news.json": news,
+               "/data/news.json": news, "/data/kr.json": kr_board, "/data/stocks.json": stocks,
                "/data/estimates.json": estimates_data}.get(self.path.split("?")[0])
         if api:
             try:
