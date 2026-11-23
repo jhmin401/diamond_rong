@@ -469,14 +469,59 @@ def earnings_week():
     return {"days": days, "today": time.strftime("%Y-%m-%d", time.gmtime(ny)), "items": items}
 
 
+# S&P 500 11개 섹터 (SPDR 섹터 ETF)
+US_SECTOR_ETF = [("XLK", "기술"), ("XLC", "커뮤니케이션"), ("XLY", "경기소비재"), ("XLP", "필수소비재"),
+                 ("XLE", "에너지"), ("XLF", "금융"), ("XLV", "헬스케어"), ("XLI", "산업재"), ("XLB", "소재"),
+                 ("XLRE", "부동산"), ("XLU", "유틸리티")]
+
+
+def us_sector_etfs():
+    """섹터 ETF의 1일·1주(5거래일)·1개월(21거래일)·연초 이후 수익률."""
+    def one(x):
+        sym, nm = x
+        pts, _ = yahoo_points(sym, "1y", "1d")
+        if len(pts) < 2:
+            return None
+        last = pts[-1][1]
+        ret = lambda k: round((last / pts[-1 - k][1] - 1) * 100, 2) if len(pts) > k else None
+        year = time.strftime("%Y", time.gmtime(pts[-1][0]))
+        prev_year = [v for t, v in pts if time.strftime("%Y", time.gmtime(t)) < year]
+        return {"sym": sym, "nm": nm, "last": last, "r": {"1": ret(1), "5": ret(5), "21": ret(21),
+                "ytd": round((last / prev_year[-1] - 1) * 100, 2) if prev_year else None}}
+    with ThreadPoolExecutor(6) as ex:
+        return [r for r in ex.map(lambda x: safe(one, x, label=x[0]), US_SECTOR_ETF) if r]
+
+
+def us_industries():
+    """시총 상위 종목(네이버 한글 업종이 있는 것)을 업종별로 묶어 시총 가중 등락률을 낸다.
+    국장 업종 히트맵과 같은 모양: {no, nm, pct, up, dn, fl, cap(백만 달러), stocks:[[티커, 이름, null, 등락률, 시총]]}"""
+    groups = {}
+    for r in us_stocks()["rows"]:
+        if not r[7] or not r[6] or r[4] is None or not r[5]:
+            continue  # 네이버 업종이 있는 종목만
+        groups.setdefault(r[6], []).append([r[0], r[1] or r[2], None, r[4], r[5]])
+    out = []
+    for i, (nm, ms) in enumerate(sorted(groups.items())):
+        if len(ms) < 3:
+            continue  # 종목이 너무 적은 업종은 뺀다
+        cap = sum(m[4] for m in ms)
+        out.append({"no": i, "nm": nm, "pct": round(sum(m[3] * m[4] for m in ms) / cap, 2),
+                    "up": sum(m[3] > 0 for m in ms), "dn": sum(m[3] < 0 for m in ms), "fl": sum(m[3] == 0 for m in ms),
+                    "cap": cap, "stocks": sorted(ms, key=lambda m: -m[4])})
+    out.sort(key=lambda x: -x["pct"])
+    return out
+
+
 def us_board():
     """미장 탭: 지수 차트 · SEC 8-K · 실적 발표 일정."""
     with ThreadPoolExecutor(6) as ex:
         charts = ex.map(lambda x: safe(us_index_chart, x[1], label=x[1]), US_INDEX)
         disc = ex.submit(sec_8k)
         earn = ex.submit(earnings_week)
+        etfs = ex.submit(safe, us_sector_etfs)
+        inds = ex.submit(safe, us_industries)
         charts = dict(zip([k for k, _ in US_INDEX], charts))
-        data = {"charts": charts, "updated": int(time.time())}
+        data = {"charts": charts, "etfs": etfs.result(), "sectors": inds.result(), "updated": int(time.time())}
         try:
             data["disc"] = {"items": disc.result()}
         except Exception as e:
