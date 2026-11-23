@@ -192,7 +192,8 @@ a.card:hover{background:var(--chip)}
 <header>
   <div class="top"><h1><svg class="kitty-face" viewBox="0 0 60 52" aria-hidden="true"><path d="M8 20 L6 4 L20 13 Z M52 20 L54 4 L40 13 Z" fill="#fff" stroke="#4a2c3a" stroke-width="2.5" stroke-linejoin="round"/><ellipse cx="30" cy="30" rx="25" ry="19" fill="#fff" stroke="#4a2c3a" stroke-width="2.5"/><ellipse cx="20" cy="31" rx="2.6" ry="3.4" fill="#4a2c3a"/><ellipse cx="40" cy="31" rx="2.6" ry="3.4" fill="#4a2c3a"/><ellipse cx="30" cy="36" rx="3" ry="2.2" fill="#ffd34d" stroke="#4a2c3a" stroke-width="1.2"/><path d="M3 30h9M3 35l9-2M57 30h-9M57 35l-9-2" stroke="#4a2c3a" stroke-width="2" stroke-linecap="round"/><g transform="translate(44 12) rotate(15)"><path d="M0 0 L-11 -8 L-11 8 Z M0 0 L11 -8 L11 8 Z" fill="#ff2d6f" stroke="#4a2c3a" stroke-width="1.5" stroke-linejoin="round"/><circle r="4" fill="#ff2d6f" stroke="#4a2c3a" stroke-width="1.5"/></g></svg>JIHONG Research</h1><div class="right"><span class="upd" id="upd">불러오는 중…</span><button class="skin-btn" id="skin">🎀 키티</button></div></div>
   <nav id="tabs">
-    <button data-tab="market" class="on">국장·미장</button>
+    <button data-tab="kr" class="on">국장</button>
+    <button data-tab="us">미장</button>
     <button data-tab="newhigh">신고가</button>
     <button data-tab="macro">매크로</button>
     <button data-tab="news">주요뉴스</button>
@@ -200,9 +201,8 @@ a.card:hover{background:var(--chip)}
   </nav>
 </header>
 <main>
-  <div id="tab-market">
-    <div class="cols"><div class="skel"></div><div class="skel"></div></div>
-  </div>
+  <div id="tab-kr"><div class="skel"></div></div>
+  <div id="tab-us" hidden><div class="skel"></div></div>
   <div id="tab-newhigh" hidden>
     <section class="mkt">
       <div class="mhead"><h2>오늘 52주 신고가</h2><span class="badge" id="nh-count">-</span>
@@ -258,7 +258,7 @@ skinLabel();
 // 탭 전환
 document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => {
   document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x === b));
-  const tab = b.dataset.tab, built = ["market", "newhigh", "macro", "news", "estimate"];
+  const tab = b.dataset.tab, built = ["kr", "us", "newhigh", "macro", "news", "estimate"];
   for (const t of built) $("#tab-" + t).hidden = t !== tab;
   if (tab === "newhigh") loadHighs();
   if (tab === "macro") loadMacro();
@@ -326,9 +326,8 @@ function market(title, idx, ref) {
 async function load() {
   try {
     const d = await (await fetch("data/market.json", {cache: "no-store"})).json();
-    $("#tab-market").innerHTML = `<div class="cols">
-      ${market("국장", d.kr_index, d.kr_index[0])}
-      ${market("미장", d.us_index, d.us_index[0])}</div>`;
+    $("#tab-kr").innerHTML = market("국장", d.kr_index, d.kr_index[0]);
+    $("#tab-us").innerHTML = market("미장", d.us_index, d.us_index[0]);
     $("#upd").textContent = "업데이트 " + new Date(d.updated * 1000).toLocaleTimeString("ko-KR", {hour12: false});
   } catch (e) {
     $("#upd").textContent = "연결 실패 · 다시 시도 중";
