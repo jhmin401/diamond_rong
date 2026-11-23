@@ -104,7 +104,8 @@ a.card:hover{background:var(--chip)}
 .board .cols{align-items:start}
 .ctrl2{display:flex;flex-wrap:wrap;gap:8px 14px;margin-bottom:10px}
 .ctrl2 .filters{margin:0}
-.board .filters{flex-wrap:wrap}
+.board .filters,.nh-ctrl .filters{flex-wrap:wrap}
+#nh-list .n small{white-space:normal}
 .board .filters button{white-space:nowrap;flex:none}
 .simg.miss{display:none}
 .noimg{font-size:13px;color:var(--sub);padding:24px 0;text-align:center;border:1px dashed var(--line);border-radius:10px;margin-top:4px}
@@ -266,8 +267,13 @@ span.co{cursor:default}
     <section class="mkt">
       <div class="mhead"><h2>오늘 52주 신고가</h2><span class="badge" id="nh-count">-</span>
         <span class="hours" id="nh-sort"></span></div>
-      <div class="filters" id="nh-filter">
-        <button data-m="all" class="on">전체</button><button data-m="코스피">코스피</button><button data-m="코스닥">코스닥</button>
+      <div class="ctrl2 nh-ctrl">
+        <div class="filters" id="nh-filter">
+          <button data-m="all" class="on">전체</button><button data-m="코스피">코스피</button><button data-m="코스닥">코스닥</button>
+        </div>
+        <div class="filters" id="nh-cap">
+          <button data-c="0" class="on">시총 전체</button><button data-c="3000">3천억 이상</button><button data-c="1000">1천억 이상</button>
+        </div>
       </div>
       <div class="nh" id="nh-list"><div class="err" style="padding:24px 0">불러오는 중…</div></div>
     </section>
@@ -720,12 +726,13 @@ document.querySelectorAll("#nw-filter button").forEach(b => b.onclick = () => {
 });
 
 // 신고가 탭
-let highs = null, highFilter = "all";
+let highs = null, highFilter = "all", highCap = 0;  // highCap: 시가총액 하한(억원)
+try { highCap = +(localStorage.getItem("nhCap") || 0); } catch (e) {}
 const eok = v => v == null ? "-" : Math.round(v / 1e8).toLocaleString("ko-KR") + "억";
 
 function renderHighs() {
   if (!highs) return;
-  const list = highs.stocks.filter(s => highFilter === "all" || s.market === highFilter);
+  const list = highs.stocks.filter(s => (highFilter === "all" || s.market === highFilter) && (s.cap ?? 0) / 1e8 >= highCap);
   $("#nh-count").textContent = list.length + "종목";
   $("#nh-sort").textContent = "등락률 순";
   $("#nh-list").innerHTML = list.length ? list.map((s, i) => {
@@ -733,10 +740,10 @@ function renderHighs() {
     return `<a href="https://m.stock.naver.com/domestic/stock/${s.code}/total" target="_blank" rel="noopener">
       <span class="rk">${i + 1}</span>
       <div class="n">${s.name}<span class="mk">${s.market}</span>
-        <small>신고가 ${s.high52?.toLocaleString("ko-KR")}${atHigh ? '<span class="keep">● 고가 유지</span>' : ""} · 거래대금 ${eok(s.amount)}</small></div>
+        <small>신고가 ${s.high52?.toLocaleString("ko-KR")}${atHigh ? '<span class="keep">● 고가 유지</span>' : ""} · 시총 ${capTxt(s.cap == null ? null : Math.round(s.cap / 1e8))} · 거래대금 ${eok(s.amount)}</small></div>
       <div class="r"><b>${s.price?.toLocaleString("ko-KR")}</b>
         <span class="${c}">${arrow(s.pct)} ${s.pct >= 0 ? "+" : ""}${(s.pct ?? 0).toFixed(2)}%</span></div></a>`;
-  }).join("") : `<div class="err" style="padding:24px 0">오늘 신고가 종목이 없어요</div>`;
+  }).join("") : `<div class="err" style="padding:24px 0">${highs.stocks.length ? "조건에 맞는 신고가 종목이 없어요" : "오늘 신고가 종목이 없어요"}</div>`;
 }
 
 async function loadHighs() {
@@ -753,6 +760,15 @@ document.querySelectorAll("#nh-filter button").forEach(b => b.onclick = () => {
   document.querySelectorAll("#nh-filter button").forEach(x => x.classList.toggle("on", x === b));
   highFilter = b.dataset.m;
   renderHighs();
+});
+document.querySelectorAll("#nh-cap button").forEach(b => {
+  b.classList.toggle("on", +b.dataset.c === highCap);
+  b.onclick = () => {
+    document.querySelectorAll("#nh-cap button").forEach(x => x.classList.toggle("on", x === b));
+    highCap = +b.dataset.c;
+    try { localStorage.setItem("nhCap", highCap); } catch (e) {}
+    renderHighs();
+  };
 });
 
 // 매크로 탭
