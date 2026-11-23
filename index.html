@@ -108,6 +108,31 @@ a.card:hover{background:var(--chip)}
 #nh-list .n small{white-space:normal}
 .board .filters button{white-space:nowrap;flex:none}
 .simg.miss{display:none}
+/* 투자자별 수급 */
+.fl-row{display:grid;grid-template-columns:56px 108px 1fr;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.fl-row:first-of-type{border-top:0}
+.fl-row .who{font-weight:600}
+.fl-row .v{text-align:right;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fl-row svg{display:block;width:100%;height:40px}
+.fl-prog{font-size:12px;color:var(--sub);margin-top:8px;font-variant-numeric:tabular-nums}
+.fl-prog b{font-weight:600}
+@media (max-width:520px){.fl-row{grid-template-columns:48px 92px 1fr;gap:8px}}
+/* 업종 히트맵 */
+.hm{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px}
+.hm button:not(.more){border:0;border-radius:8px;padding:8px 9px;text-align:left;font:inherit;cursor:pointer;min-width:0;color:var(--text);
+  background:color-mix(in srgb,var(--tint) var(--a),var(--card));outline:1px solid var(--line);outline-offset:-1px}
+.hm button.dark{color:#fff}
+.hm .more{margin-top:2px}
+.hm button.sel{outline:2px solid var(--accent)}
+.hm .hn{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hm .hp{display:block;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.hm .hc{display:block;font-size:11px;opacity:.85;font-variant-numeric:tabular-nums}
+@media (max-width:520px){.hm{grid-template-columns:repeat(3,1fr)}}
+.hm-detail{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+.hm-detail .hd{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.hm-detail .hd h3{font-size:16px;font-weight:700}
+.hm-detail .hd small{color:var(--sub);font-size:12px}
+.hm-detail .x{margin-left:auto;border:0;background:none;color:var(--sub);font:inherit;font-size:13px;cursor:pointer}
 .noimg{font-size:13px;color:var(--sub);padding:24px 0;text-align:center;border:1px dashed var(--line);border-radius:10px;margin-top:4px}
 .er{display:flex;gap:10px;padding:10px 2px;border-top:1px solid var(--line);align-items:center}
 .er:first-child{border-top:0}
@@ -466,7 +491,7 @@ const BOARD_CFG = {
 function makeBoard(p, cfg) {
   const B = {p, cfg, data: null, at: 0, rows: null, rowsAt: 0, byName: new Map(), byCode: new Map(),
              kc: {idx: cfg.idx[0][0], range: 0}, dc: {mkt: "all", cat: "all", shown: 20}, sq: null, chart: cfg.defaultChart,
-             earn: {day: null, big: true}};
+             earn: {day: null, big: true}, fl: {mk: "kospi", per: 1}, hm: {sort: "pct", sel: null, shown: 15, all: false}};
   const $p = id => document.getElementById(`${p}-${id}`);
   try { B.kc.idx = localStorage.getItem(p + "Idx") || B.kc.idx; B.kc.range = +(localStorage.getItem(p + "Range") || 0); } catch (e) {}
   if (!cfg.idx.some(x => x[0] === B.kc.idx)) B.kc.idx = cfg.idx[0][0];
@@ -477,7 +502,19 @@ function makeBoard(p, cfg) {
       <div id="${p}-elist"><div class="err" style="padding:24px 0">불러오는 중…</div></div>
       <p class="sq-note">장전 발표는 한국시간 그날 밤, 장후 발표는 다음날 새벽(06시 전후)이고, 컨콜은 보통 발표 직후 열려요. ‘녹취록’은 컨콜 녹취록 검색으로 연결돼요.</p>
     </section>` : "";
-  $(`#tab-${p}`).insertAdjacentHTML("beforeend", `
+  const krSecs = p === "kr" ? `<section class="mkt">
+      <div class="mhead"><h2>투자자별 순매수</h2><span class="badge" id="${p}-fday">-</span><span class="hours">단위 억원 · 장중엔 잠정치</span></div>
+      <div class="ctrl2">${chips("fmk", [["kospi", "코스피"], ["kosdaq", "코스닥"]], "kospi")}${chips("fper", [[1, "오늘"], [5, "5일"], [20, "20일"]], 1)}</div>
+      <div id="${p}-flows"><div class="err" style="padding:24px 0">불러오는 중…</div></div>
+      <div class="fl-prog" id="${p}-prog"></div>
+    </section>
+    <section class="mkt">
+      <div class="mhead"><h2>업종별 등락</h2><span class="badge" id="${p}-hcount">-</span><span class="hours">네이버 업종 · 누르면 종목</span></div>
+      <div class="ctrl2">${chips("hsort", [["pct", "등락률순"], ["cap", "시총 큰 업종순"]], "pct")}</div>
+      <div class="hm" id="${p}-hm"><div class="err" style="padding:24px 0">불러오는 중…</div></div>
+      <div id="${p}-hmd"></div>
+    </section>` : "";
+  $(`#tab-${p}`).insertAdjacentHTML("beforeend", `${krSecs}
     <section class="mkt">
       <div class="mhead"><h2>지수 차트</h2><span class="hours" id="${p}-cinfo"></span></div>
       <div class="ctrl2">${chips("idx", cfg.idx, B.kc.idx)}${chips("range", [[0, "당일"], [30, "1개월"], [91, "3개월"], [365, "1년"]], B.kc.range)}</div>
@@ -577,6 +614,81 @@ function makeBoard(p, cfg) {
     $p("elist").addEventListener("click", e => { const b = e.target.closest("button.co"); if (b) { B.open(b.dataset.code); $p("sq").closest("section").scrollIntoView({behavior: "smooth", block: "start"}); } });
   }
 
+  // 투자자별 순매수 (국장)
+  const eokSigned = v => v == null ? "-" : `${v > 0 ? "+" : ""}${v.toLocaleString("ko-KR")}억`;
+  B.renderFlows = () => {
+    if (p !== "kr" || !B.data) return;
+    const F = B.data.flows, box = $p("flows");
+    const rows = F?.[B.fl.mk] || [];
+    if (!rows.length) { box.innerHTML = `<div class="err" style="padding:24px 0">수급 자료를 불러오지 못했어요</div>`; $p("prog").textContent = ""; return; }
+    const per = Math.min(B.fl.per, rows.length), from = rows.length - per;
+    $p("fday").textContent = per === 1 ? mdw(rows.at(-1).d) : `${mdw(rows[from].d)} ~ ${mdw(rows.at(-1).d)}`;
+    const W = 300, H = 40;
+    box.innerHTML = [["frg", "외국인"], ["inst", "기관"], ["ind", "개인"]].map(([k, who]) => {
+      const sum = rows.slice(from).reduce((a, r) => a + (r[k] || 0), 0);
+      const max = Math.max(1, ...rows.map(r => Math.abs(r[k] || 0))), bw = W / rows.length;
+      const bars = rows.map((r, i) => {
+        const v = r[k] || 0, h = Math.abs(v) / max * (H / 2 - 1);
+        return `<rect x="${(i * bw + bw * 0.15).toFixed(1)}" width="${(bw * 0.7).toFixed(1)}" y="${(v > 0 ? H / 2 - h : H / 2).toFixed(1)}" height="${Math.max(h, 0.5).toFixed(1)}"
+          fill="var(${v >= 0 ? "--up" : "--down"})" opacity="${i >= from ? 1 : 0.28}"><title>${mdw(r.d)} ${who} ${eokSigned(v)}</title></rect>`;
+      }).join("");
+      return `<div class="fl-row"><span class="who">${who}</span><span class="v ${dir(sum)}">${eokSigned(sum)}</span>
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line x1="0" x2="${W}" y1="${H / 2}" y2="${H / 2}" stroke="var(--grid)"/>${bars}</svg></div>`;
+    }).join("") + `<div class="sq-note">막대는 최근 ${rows.length}거래일 (진한 부분이 선택한 기간)</div>`;
+    const pg = F.program?.[B.fl.mk];
+    $p("prog").innerHTML = pg && pg.total != null ? `오늘 프로그램 매매 · 차익 <b class="${dir(pg.arb)}">${eokSigned(pg.arb)}</b> · 비차익 <b class="${dir(pg.nonarb)}">${eokSigned(pg.nonarb)}</b> · 합계 <b class="${dir(pg.total)}">${eokSigned(pg.total)}</b>` : "";
+  };
+
+  // 업종별 등락 히트맵 (국장)
+  B.renderSectors = () => {
+    if (p !== "kr" || !B.data) return;
+    const S = B.data.sectors, box = $p("hm");
+    if (!S?.length) { box.innerHTML = `<div class="err" style="padding:24px 0">업종 자료를 불러오지 못했어요</div>`; return; }
+    let list = [...S].sort((a, b) => B.hm.sort === "cap" ? b.cap - a.cap : (b.pct ?? 0) - (a.pct ?? 0));
+    // 폰처럼 좁은 화면에서는 처음에 위·아래 10개씩만 (등락률순) 또는 상위 20개 (시총순)
+    const fold = !B.hm.all && innerWidth < 700 && list.length > 20;
+    if (fold) list = B.hm.sort === "cap" ? list.slice(0, 20) : [...list.slice(0, 10), ...list.slice(-10)];
+    const up = S.filter(x => x.pct > 0).length, dn = S.filter(x => x.pct < 0).length;
+    $p("hcount").textContent = `상승 ${up} · 하락 ${dn}`;
+    box.innerHTML = list.map(x => {
+      const a = x.pct ? Math.min(85, 12 + Math.abs(x.pct) / 4 * 73) : 0;
+      return `<button data-no="${x.no}" class="${a > 55 ? "dark" : ""} ${B.hm.sel === x.no ? "sel" : ""}"
+        style="--tint:var(${x.pct > 0 ? "--up" : x.pct < 0 ? "--down" : "--chip"});--a:${a.toFixed(0)}%" title="${esc(x.nm)} ${pctTxt(x.pct)}">
+        <span class="hn">${esc(x.nm)}</span><span class="hp">${pctTxt(x.pct)}</span><span class="hc">▲${x.up ?? 0} ▼${x.dn ?? 0}</span></button>`;
+    }).join("") + (fold ? `<button class="more hm-all" style="grid-column:1/-1">${B.hm.sort === "cap" ? "" : "가운데 "}${S.length - 20}개 업종 더 보기</button>`
+                        : B.hm.all && innerWidth < 700 ? `<button class="more hm-all" style="grid-column:1/-1">접기</button>` : "");
+    B.renderSectorDetail();
+  };
+  B.renderSectorDetail = () => {
+    const box = $p("hmd"), x = B.data?.sectors?.find(s => s.no === B.hm.sel);
+    if (!x) { box.innerHTML = ""; return; }
+    const ms = x.stocks;
+    box.innerHTML = `<div class="hm-detail"><div class="hd"><h3>${esc(x.nm)}</h3><span class="${dir(x.pct)}" style="font-weight:700">${pctTxt(x.pct)}</span>
+        <small>${ms.length}종목 · 시총 ${capTxt(x.cap)} · 상승 ${x.up ?? 0} · 하락 ${x.dn ?? 0}</small><button class="x">닫기 ✕</button></div>
+      <div class="sq-note">시가총액 큰 순 · 종목을 누르면 아래 종목 검색에서 자세히 보여줘요</div>
+      <div class="nh">${ms.slice(0, B.hm.shown).map(m => `<a href="#" data-code="${m[0]}"><div class="n">${esc(m[1])}<span class="mk">${m[2] ? "코스닥" : "코스피"}</span>
+        <small>${m[0]} · 시총 ${capTxt(m[4])}</small></div><div class="r"><b class="${dir(m[3])}">${pctTxt(m[3])}</b></div></a>`).join("")}</div>
+      ${ms.length > B.hm.shown ? `<button class="more">더 보기 (${ms.length - B.hm.shown}종목 남음)</button>` : ""}</div>`;
+  };
+  if (p === "kr") {
+    $p("hm").addEventListener("click", e => {
+      if (e.target.closest(".hm-all")) { B.hm.all = !B.hm.all; B.renderSectors(); return; }
+      const b = e.target.closest("button[data-no]");
+      if (!b) return;
+      const no = +b.dataset.no;
+      B.hm.sel = B.hm.sel === no ? null : no; B.hm.shown = 15;
+      $p("hm").querySelectorAll("button").forEach(x => x.classList.toggle("sel", +x.dataset.no === B.hm.sel));
+      B.renderSectorDetail();
+      if (B.hm.sel) $p("hmd").scrollIntoView({behavior: "smooth", block: "nearest"});
+    });
+    $p("hmd").addEventListener("click", e => {
+      if (e.target.closest(".x")) { B.hm.sel = null; B.renderSectors(); return; }
+      if (e.target.closest(".more")) { B.hm.shown += 30; B.renderSectorDetail(); return; }
+      const a = e.target.closest("a[data-code]");
+      if (a) { e.preventDefault(); B.open(a.dataset.code); $p("sq").closest("section").scrollIntoView({behavior: "smooth", block: "start"}); }
+    });
+  }
+
   const line = s => `<a href="#" data-code="${esc(s.code)}"><div class="n">${esc(s.name)}<span class="mk">${esc(s.tag)}</span>
       <small>${esc(s.sub)}</small></div><div class="r"><b>${s.price}</b><span class="${dir(s.pct)}">${pctTxt(s.pct)}</span></div></a>`;
 
@@ -658,13 +770,16 @@ function makeBoard(p, cfg) {
   bindChips("dcmkt", v => { B.dc.mkt = v; B.dc.shown = 20; B.renderDisc(); });
   bindChips("dccat", v => { B.dc.cat = v; B.dc.shown = 20; B.renderDisc(); });
   bindChips("ebig", v => { B.earn.big = v === "1"; B.renderEarn(); });
+  bindChips("fmk", v => { B.fl.mk = v; B.renderFlows(); });
+  bindChips("fper", v => { B.fl.per = +v; B.renderFlows(); });
+  bindChips("hsort", v => { B.hm.sort = v; B.renderSectors(); });
 
   B.load = async () => {
     const jobs = [];
     if (!B.data || Date.now() - B.at > 300000) jobs.push(fetch(cfg.data, {cache: "no-store"}).then(r => r.json()).then(d => {
       B.data = d; B.at = Date.now();
     }).catch(() => {
-      if (!B.data) for (const id of ["chart", "dclist", "elist"]) if ($p(id)) $p(id).innerHTML = `<div class="err" style="padding:24px 0">불러오기 실패 · 다시 시도 중</div>`;
+      if (!B.data) for (const id of ["chart", "dclist", "elist", "flows", "hm"]) if ($p(id)) $p(id).innerHTML = `<div class="err" style="padding:24px 0">불러오기 실패 · 다시 시도 중</div>`;
     }));
     if (!B.rows || Date.now() - B.rowsAt > 600000) jobs.push(fetch(cfg.stocks, {cache: "no-store"}).then(r => r.json()).then(d => {
       B.rows = d.rows; B.rowsAt = Date.now();
@@ -676,7 +791,7 @@ function makeBoard(p, cfg) {
     }));
     if (!jobs.length) return;
     await Promise.all(jobs);
-    B.renderChart(); B.renderDisc(); B.renderEarn();
+    B.renderFlows(); B.renderSectors(); B.renderChart(); B.renderDisc(); B.renderEarn();
     // 상세를 보고 있으면 새 시세로 다시 그리고, 아니면 목록 갱신
     if (B.rows) B.sq ? B.open(B.sq) : B.search();
   };
