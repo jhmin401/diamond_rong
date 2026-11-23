@@ -223,6 +223,221 @@ def kr_board():
     return {"charts": charts, "disc": {"day": day, "items": disc}, "updated": int(time.time())}
 
 
+
+# ---------------- 미장 탭 ----------------
+# SEC는 자동 접속에 도구 이름을 밝힌 User-Agent를 요구한다
+SEC_UA = "personal-market-dashboard/1.0"
+NASDAQ_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                                "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36", "Accept": "application/json"}
+
+
+def get_json(url, headers=None, timeout=30):
+    req = urllib.request.Request(url, headers=headers or {"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read())
+
+
+def us_time(t, fmt):
+    """유닉스 시각 → 한국시간 문자열."""
+    return time.strftime(fmt, time.gmtime(t + 9 * 3600))
+
+
+def us_index_chart(symbol):
+    """미국 지수 차트: 당일 5분(한국시간, 정규장 전체 칸 포함)과 1년 일봉."""
+    url = (f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(symbol)}"
+           "?range=1d&interval=5m")
+    res = json.loads(get(url))["chart"]["result"][0]
+    meta = res["meta"]
+    closes = res["indicators"]["quote"][0]["close"]
+    day = [(us_time(t, "%H:%M"), round(c, 2)) for t, c in zip(res.get("timestamp") or [], closes) if c is not None]
+    reg = meta.get("currentTradingPeriod", {}).get("regular", {})
+    # 장이 쉬는 날이면 currentTradingPeriod가 다음 장을 가리키므로 실제 데이터 시각으로 맞춘다
+    ts = res.get("timestamp") or []
+    start = ts[0] - ts[0] % 300 if ts else reg.get("start")
+    end = start + (reg["end"] - reg["start"]) if start and reg.get("end") else None
+    session = [us_time(t, "%H:%M") for t in range(start, end + 1, 300)] if start and end else None
+    year, _ = yahoo_points(symbol, "1y", "1d")
+    return {"prev": meta.get("chartPreviousClose"), "day": day, "session": session,
+            "year": [(us_time(t - 9 * 3600, "%Y-%m-%d"), v) for t, v in year]}
+
+
+US_INDEX = [("spx", "^GSPC"), ("ndx", "^IXIC"), ("dji", "^DJI"), ("sox", "^SOX")]
+
+# 8-K 항목 번호 → 한글 이름, 분류
+ITEM_8K = {
+    "1.01": ("주요 계약 체결", "계약·M&A"), "1.02": ("주요 계약 해지", "계약·M&A"), "1.03": ("파산·회생", "리스크"),
+    "1.05": ("사이버 보안 사고", "리스크"),
+    "2.01": ("자산 인수·처분", "계약·M&A"), "2.02": ("실적 발표", "실적"), "2.03": ("채무 발생", "자금조달"),
+    "2.04": ("채무 조기상환 사유", "리스크"), "2.05": ("구조조정 비용", "리스크"), "2.06": ("자산 손상", "리스크"),
+    "3.01": ("상장 유지 요건 미달", "리스크"), "3.02": ("비등록 증권 발행", "자금조달"), "3.03": ("주주 권리 변경", "지배구조"),
+    "4.01": ("감사인 변경", "리스크"), "4.02": ("과거 재무제표 신뢰 불가", "리스크"),
+    "5.01": ("지배권 변경", "계약·M&A"), "5.02": ("임원·이사 변동", "지배구조"), "5.03": ("정관 변경", "지배구조"),
+    "5.07": ("주총 결과", "지배구조"), "5.08": ("주총 일정", "지배구조"),
+    "7.01": ("공정공시(Reg FD)", "기타"), "8.01": ("기타 주요사항", "기타"), "9.01": ("재무제표·첨부", "기타"),
+}
+CAT_ORDER = ["실적", "계약·M&A", "자금조달", "리스크", "지배구조", "기타"]
+
+
+def sec_8k(days=4):
+    """최근 며칠 SEC 8-K 중 상장 종목(티커가 있는 회사) 것만."""
+    import re
+    end = time.strftime("%Y-%m-%d", time.gmtime())
+    start = time.strftime("%Y-%m-%d", time.gmtime(time.time() - days * 86400))
+    hits = []
+    for page in range(10):
+        d = get_json("https://efts.sec.gov/LATEST/search-index?forms=8-K&dateRange=custom"
+                     f"&startdt={start}&enddt={end}&from={page * 100}", {"User-Agent": SEC_UA})
+        part = d["hits"]["hits"]
+        hits += part
+        if len(part) < 100:
+            break
+    seen, out = set(), []
+    for h in hits:
+        src = h["_source"]
+        adsh = src.get("adsh")
+        if not adsh or adsh in seen:
+            continue
+        for name in src.get("display_names", []):
+            m = re.match(r"(.*?)\s+\(([A-Z0-9.\-, ]+)\)\s+\(CIK (\d+)\)", name)
+            if m:
+                break
+        else:
+            continue  # 티커 없는 회사(펀드·비상장)는 뺀다
+        seen.add(adsh)
+        items = [i for i in src.get("items", []) if i in ITEM_8K]
+        main = [i for i in items if i != "9.01"] or items
+        cats = [ITEM_8K[i][1] for i in main]
+        cat = min(cats, key=CAT_ORDER.index) if cats else "기타"
+        cik = int(m.group(3))
+        out.append({"t": src["file_date"][5:].replace("-", "/"), "d": src["file_date"], "code": m.group(2).split(",")[0].strip(),
+                    "nm": m.group(1).strip(), "title": " · ".join(ITEM_8K[i][0] for i in main) or "수시공시",
+                    "cat": cat, "url": f"https://www.sec.gov/Archives/edgar/data/{cik}/{adsh.replace('-', '')}/{adsh}-index.htm"})
+    out.sort(key=lambda x: x["d"], reverse=True)
+    return out
+
+
+def earnings_week():
+    """나스닥 실적 발표 일정: 미국 기준 지난 3거래일 ~ 다음 7거래일 (시총 3억 달러 이상)."""
+    ny = time.time() - 5 * 3600  # 미국 동부 (대략)
+    days = []
+    for k in range(-5, 12):
+        t = ny + k * 86400
+        if time.gmtime(t).tm_wday < 5:
+            days.append(time.strftime("%Y-%m-%d", time.gmtime(t)))
+    days = [d for d in days if d < time.strftime("%Y-%m-%d", time.gmtime(ny))][-3:] + \
+           [d for d in days if d >= time.strftime("%Y-%m-%d", time.gmtime(ny))][:7]
+
+    def money(v):
+        try:
+            return float(str(v).replace("$", "").replace(",", "").replace("(", "-").replace(")", ""))
+        except (TypeError, ValueError):
+            return None
+
+    def one(day):
+        try:
+            rows = get_json(f"https://api.nasdaq.com/api/calendar/earnings?date={day}", NASDAQ_HEADERS)["data"]["rows"] or []
+        except Exception:
+            return []
+        out = []
+        for r in rows:
+            cap = money(r.get("marketCap"))
+            if not cap or cap < 3e8:
+                continue
+            out.append({"d": day, "sym": r["symbol"], "nm": r["name"], "cap": round(cap / 1e6),
+                        "when": {"time-pre-market": "pre", "time-after-hours": "post"}.get(r.get("time"), ""),
+                        "q": r.get("fiscalQuarterEnding"), "est": money(r.get("epsForecast")), "n": r.get("noOfEsts"),
+                        "eps": money(r.get("eps")), "sur": money(r.get("surprise")), "ly": money(r.get("lastYearEPS"))})
+        return out
+
+    with ThreadPoolExecutor(5) as ex:
+        res = list(ex.map(one, days))
+    items = [x for part in res for x in part]
+    items.sort(key=lambda x: (x["d"], -x["cap"]))
+    return {"days": days, "today": time.strftime("%Y-%m-%d", time.gmtime(ny)), "items": items}
+
+
+def us_board():
+    """미장 탭: 지수 차트 · SEC 8-K · 실적 발표 일정."""
+    with ThreadPoolExecutor(6) as ex:
+        charts = ex.map(lambda x: us_index_chart(x[1]), US_INDEX)
+        disc = ex.submit(sec_8k)
+        earn = ex.submit(earnings_week)
+        charts = dict(zip([k for k, _ in US_INDEX], charts))
+        data = {"charts": charts, "updated": int(time.time())}
+        try:
+            data["disc"] = {"items": disc.result()}
+        except Exception as e:
+            data["disc"] = {"items": [], "error": str(e)}
+        try:
+            data["earn"] = earn.result()
+        except Exception as e:
+            data["earn"] = {"days": [], "items": [], "error": str(e)}
+    return data
+
+
+_us_stocks_cache = {"at": 0, "data": None}
+NAVER_US = [("NASDAQ", 5), ("NYSE", 5), ("AMEX", 1)]  # (거래소, 100종목씩 몇 페이지)
+
+
+def us_stocks():
+    """미국 종목 (종목검색용). 한 종목 = [티커, 한글 이름, 영문 이름, 현재가, 등락률, 시총(백만 달러),
+    업종, 네이버 코드(차트 이미지용, 없으면 null)]."""
+    if _us_stocks_cache["data"] and time.time() - _us_stocks_cache["at"] < CACHE_SEC:
+        return _us_stocks_cache["data"]
+
+    def num(v):
+        try:
+            return float(str(v).replace("$", "").replace(",", "").replace("%", ""))
+        except (TypeError, ValueError):
+            return None
+
+    jobs = [("naver", ex_, p) for ex_, n in NAVER_US for p in range(1, n + 1)] + [("nasdaq", None, None)]
+
+    def fetch_job(j):
+        try:
+            if j[0] == "naver":
+                return j, get_json(f"https://api.stock.naver.com/stock/exchange/{j[1]}/marketValue?page={j[2]}&pageSize=100")["stocks"]
+            return j, get_json("https://api.nasdaq.com/api/screener/stocks?tableonly=true&download=true", NASDAQ_HEADERS)["data"]["rows"]
+        except Exception:
+            return j, []
+
+    with ThreadPoolExecutor(8) as ex:
+        results = list(ex.map(fetch_job, jobs))
+    key = lambda sym: sym.replace("/", ".").replace(" ", ".").upper()
+    rows = {}
+    for j, items in results:
+        if j[0] != "naver":
+            continue
+        for it in items:
+            if it.get("stockEndType") != "stock":
+                continue
+            sym = key(it["symbolCode"])
+            cap = num(it.get("marketValue"))  # 천 달러 단위
+            ind = (it.get("industryCodeType") or {}).get("industryGroupKor")
+            rows[sym] = [sym, it.get("stockName"), it.get("stockNameEng"), num(it.get("closePrice")),
+                         num(it.get("fluctuationsRatio")), round(cap / 1000) if cap else None, ind, it["reutersCode"]]
+    for j, items in results:
+        if j[0] != "nasdaq":
+            continue
+        for it in items:
+            sym = key(it["symbol"])
+            if "^" in sym:
+                continue  # 우선주 제외
+            cap = num(it.get("marketCap"))
+            price, pct = num(it.get("lastsale")), num(it.get("pctchange"))
+            if sym in rows:
+                continue  # 네이버에 있는 종목은 네이버 시세를 쓴다 (차트 이미지와 맞추려고)
+            if not cap or cap < 1e8:
+                continue
+            nm = it.get("name", "")
+            for cut in (" Common Stock", " Class A", " Ordinary Shares", " American Depositary"):
+                nm = nm.split(cut)[0]
+            rows[sym] = [sym, None, nm.strip(), price, pct, round(cap / 1e6), it.get("sector") or None, None]
+    out = sorted(rows.values(), key=lambda r: -(r[5] or 0))
+    data = {"rows": out, "updated": int(time.time())}
+    _us_stocks_cache.update(at=time.time(), data=data)
+    return data
+
 _news_cache = {"at": 0, "data": None}
 NEWS_API = "https://m.stock.naver.com/front-api/news/category?category={}&page={}&pageSize=20"
 # 실시간 뉴스 중에서 이 말머리가 붙은 것만 '속보'로 남긴다
@@ -362,6 +577,7 @@ class Handler(SimpleHTTPRequestHandler):
         # GitHub Pages와 같은 주소(data/*.json)로 내 PC에서도 바로 데이터를 준다
         api = {"/data/market.json": market, "/data/newhigh.json": new_highs, "/data/macro.json": macro,
                "/data/news.json": news, "/data/kr.json": kr_board, "/data/stocks.json": stocks,
+               "/data/us.json": us_board, "/data/us_stocks.json": us_stocks,
                "/data/estimates.json": estimates_data}.get(self.path.split("?")[0])
         if api:
             try:

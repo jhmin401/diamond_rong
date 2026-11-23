@@ -42,7 +42,8 @@ def main():
         shutil.copy(est, OUT / "data" / "estimates.json")
 
     for name, fn in [("market", server.market), ("newhigh", server.new_highs), ("macro", server.macro),
-                     ("news", server.news), ("kr", server.kr_board), ("stocks", server.stocks)]:
+                     ("news", server.news), ("kr", server.kr_board), ("stocks", server.stocks),
+                     ("us", server.us_board), ("us_stocks", server.us_stocks)]:
         try:
             write(OUT / "data" / f"{name}.json", fn())
             print(f"{name}: OK")
