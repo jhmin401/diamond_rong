@@ -98,6 +98,49 @@ a.card:hover{background:var(--chip)}
 .chart{position:relative;margin-top:6px}
 .chart svg{display:block;width:100%;overflow:visible}
 .chart text{font-size:11px;fill:var(--axis);font-variant-numeric:tabular-nums}
+/* 국장 탭: 지수 차트·종목검색·공시 */
+.kr{display:grid;gap:16px}
+.kr .cols{align-items:start}
+.ctrl2{display:flex;flex-wrap:wrap;gap:8px 14px;margin-bottom:10px}
+.ctrl2 .filters{margin:0}
+.kr .filters{flex-wrap:wrap}
+.kr .filters button{white-space:nowrap;flex:none}
+.search{width:100%;font:inherit;font-size:15px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;
+  background:var(--bg);color:var(--text);margin-bottom:6px}
+.search:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.sq-note{font-size:12px;color:var(--sub);margin:6px 2px 2px}
+.back{border:0;background:none;color:var(--sub);font:inherit;font-size:13px;cursor:pointer;padding:4px 0;margin-bottom:6px}
+.back:hover{color:var(--text)}
+.sd-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px;margin-bottom:10px}
+.sd-head h3{font-size:19px;font-weight:700}
+.sd-head small{color:var(--sub);font-size:12px}
+.sd-head .px{margin-left:auto;text-align:right;font-variant-numeric:tabular-nums}
+.sd-head .px b{font-size:20px;font-weight:700;margin-right:6px}
+.simg{display:block;width:100%;border-radius:10px;background:#fff;border:1px solid var(--line);margin-top:4px}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;margin:12px 0}
+.stats div{background:var(--chip);border-radius:10px;padding:8px 10px;min-width:0}
+.stats small{display:block;font-size:11px;color:var(--sub)}
+.stats b{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.sub2{font-size:13px;color:var(--sub);font-weight:500;margin:14px 0 4px}
+.links{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.links a{font-size:13px;color:var(--text);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:5px 12px}
+.links a:hover{background:var(--chip)}
+.dc .dr{display:flex;gap:10px;padding:10px 2px;border-top:1px solid var(--line);align-items:flex-start}
+.dc .dr:first-child{border-top:0}
+.dr .tm{flex:none;width:40px;color:var(--sub);font-size:13px;font-variant-numeric:tabular-nums;padding-top:1px}
+.dr .n{flex:1;min-width:0}
+.dr .co{border:0;background:none;padding:0;font:inherit;font-weight:600;color:var(--text);cursor:pointer}
+button.co:hover{text-decoration:underline}
+span.co{cursor:default}
+.dr a{display:block;color:var(--text);text-decoration:none;font-size:14px;margin-top:2px;overflow-wrap:anywhere}
+.dr a:hover{text-decoration:underline}
+.mk2{font-size:11px;padding:1px 6px;border-radius:4px;background:var(--chip);color:var(--sub);margin-left:4px;vertical-align:1px}
+.ct{font-size:11px;padding:1px 6px;border-radius:4px;margin-left:4px;vertical-align:1px;border:1px solid currentColor}
+.ct.c-실적{color:var(--s1)} .ct.c-계약{color:var(--s3)} .ct.c-주주환원{color:var(--up)}
+.ct.c-자금조달{color:var(--s2)} .ct.c-지분,.ct.c-기타{color:var(--sub)}
+.more{display:block;width:100%;margin-top:10px;border:1px solid var(--line);background:none;color:var(--sub);
+  font:inherit;font-size:13px;padding:8px;border-radius:10px;cursor:pointer}
+.more:hover{background:var(--chip);color:var(--text)}
 .tip{position:absolute;top:0;pointer-events:none;background:var(--card);border:1px solid var(--line);
   border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.12);white-space:nowrap;
   font-variant-numeric:tabular-nums;display:none;z-index:2}
@@ -201,7 +244,33 @@ a.card:hover{background:var(--chip)}
   </nav>
 </header>
 <main>
-  <div id="tab-kr"><div class="skel"></div></div>
+  <div id="tab-kr" class="kr">
+    <div id="kr-top"><div class="skel"></div></div>
+    <section class="mkt">
+      <div class="mhead"><h2>지수 차트</h2><span class="hours" id="kc-info"></span></div>
+      <div class="ctrl2">
+        <div class="filters" id="kc-idx"><button data-v="kospi" class="on">코스피</button><button data-v="kosdaq">코스닥</button></div>
+        <div class="filters" id="kc-range"><button data-v="0" class="on">당일</button><button data-v="30">1개월</button><button data-v="91">3개월</button><button data-v="365">1년</button></div>
+      </div>
+      <div class="tiles" id="kc-tile"></div>
+      <div class="chart" id="kc-chart"><div class="err" style="padding:24px 0">불러오는 중…</div></div>
+    </section>
+    <div class="cols">
+      <section class="mkt">
+        <div class="mhead"><h2>종목 검색</h2><span class="hours" id="sq-info"></span></div>
+        <input class="search" id="sq" type="search" placeholder="종목명 또는 코드 (예: 삼성전자, 005930)" autocomplete="off">
+        <div id="sq-body"></div>
+      </section>
+      <section class="mkt">
+        <div class="mhead"><h2>오늘의 공시</h2><span class="badge" id="dc-count">-</span><span class="hours" id="dc-day">DART</span></div>
+        <div class="ctrl2">
+          <div class="filters" id="dc-mkt"><button data-v="all" class="on">전체</button><button data-v="코스피">코스피</button><button data-v="코스닥">코스닥</button></div>
+          <div class="filters" id="dc-cat"><button data-v="all" class="on">모든 종류</button><button data-v="실적">실적</button><button data-v="계약">계약</button><button data-v="주주환원">주주환원</button><button data-v="자금조달">자금조달</button><button data-v="지분">지분</button></div>
+        </div>
+        <div class="dc" id="dc-list"><div class="err" style="padding:24px 0">불러오는 중…</div></div>
+      </section>
+    </div>
+  </div>
   <div id="tab-us" hidden><div class="skel"></div></div>
   <div id="tab-newhigh" hidden>
     <section class="mkt">
@@ -260,6 +329,7 @@ document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => {
   document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x === b));
   const tab = b.dataset.tab, built = ["kr", "us", "newhigh", "macro", "news", "estimate"];
   for (const t of built) $("#tab-" + t).hidden = t !== tab;
+  if (tab === "kr") loadKr();
   if (tab === "newhigh") loadHighs();
   if (tab === "macro") loadMacro();
   if (tab === "news") loadNews();
@@ -326,13 +396,178 @@ function market(title, idx, ref) {
 async function load() {
   try {
     const d = await (await fetch("data/market.json", {cache: "no-store"})).json();
-    $("#tab-kr").innerHTML = market("국장", d.kr_index, d.kr_index[0]);
+    $("#kr-top").innerHTML = market("국장", d.kr_index, d.kr_index[0]);
     $("#tab-us").innerHTML = market("미장", d.us_index, d.us_index[0]);
     $("#upd").textContent = "업데이트 " + new Date(d.updated * 1000).toLocaleTimeString("ko-KR", {hour12: false});
   } catch (e) {
     $("#upd").textContent = "연결 실패 · 다시 시도 중";
   }
 }
+
+// 국장 탭: 지수 차트 · 종목검색 · 오늘의 공시
+let kr = null, krAt = 0, stockRows = null, stockAt = 0, stockByName = new Map();
+const kc = {idx: "kospi", range: 0}, dc = {mkt: "all", cat: "all", shown: 20};
+let sqCode = null;
+const IDX_NAME = {kospi: "코스피", kosdaq: "코스닥"};
+// 국장 정규장 5분 간격 (09:00 ~ 15:30)
+const KR_SESSION = Array.from({length: 79}, (_, i) => { const m = 540 + i * 5; return String(m / 60 | 0).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); });
+const normName = t => String(t).replace(/\s|\(주\)|㈜/g, "").toLowerCase();
+const capTxt = v => v == null ? "-" : v >= 10000 ? (v / 10000).toLocaleString("ko-KR", {maximumFractionDigits: 1}) + "조" : v.toLocaleString("ko-KR") + "억";
+const won = v => v == null ? "-" : v.toLocaleString("ko-KR");
+const pctTxt = v => v == null ? "-" : `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
+try { kc.idx = localStorage.getItem("kcIdx") || kc.idx; kc.range = +(localStorage.getItem("kcRange") || 0); } catch (e) {}
+
+function renderKrChart() {
+  if (!kr) return;
+  const c = kr.charts[kc.idx], box = $("#kc-chart");
+  if (!c) { box.innerHTML = `<div class="err">불러오기 실패</div>`; return; }
+  const intraday = kc.range === 0;
+  const pts = intraday ? c.day : sinceDays(c.year, kc.range);
+  if (!pts.length) { box.innerHTML = `<div class="err" style="padding:24px 0">데이터가 없어요</div>`; return; }
+  const last = pts.at(-1)[1], base = intraday ? c.prev : pts[0][1], diff = last - base;
+  const col = diff > 0 ? "var(--up)" : diff < 0 ? "var(--down)" : "var(--flat)";
+  $("#kc-tile").innerHTML = `<div class="tile"><div class="tn">${IDX_NAME[kc.idx]} · ${intraday ? "전일 대비" : "기간 수익률"}</div>
+    <div class="tv">${num2(last, 2)}<small class="${dir(diff)}">${arrow(diff)} ${num2(Math.abs(diff), 2)} (${pctTxt(diff / base * 100)})</small></div></div>`;
+  $("#kc-info").textContent = intraday ? `당일 5분 · ${pts.at(-1)[0]} 기준` : `일봉 · ${pts[0][0].replace(/-/g, ".")} ~ ${pts.at(-1)[0].replace(/-/g, ".")}`;
+  // 당일 차트는 장이 끝날 때까지 빈 자리를 남겨 진행 상황이 보이게 한다
+  const domain = intraday && pts[0][0] >= "09:00" && pts.at(-1)[0] <= "15:30" ? KR_SESSION : null;
+  lineChart(box, [{name: IDX_NAME[kc.idx], points: pts, color: col}], false,
+    intraday ? {domain, ref: c.prev, label: d => d} : {});
+}
+
+function discRow(d) {
+  const has = stockByName.has(normName(d.nm));
+  const co = has ? `<button class="co" data-nm="${esc(d.nm)}">${esc(d.nm)}</button>` : `<span class="co">${esc(d.nm)}</span>`;
+  return `<div class="dr"><span class="tm">${esc(d.t)}</span><div class="n">${co}<span class="mk2">${d.m}</span>${d.cat !== "기타" ? `<span class="ct c-${d.cat}">${d.cat}</span>` : ""}
+    <a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${d.id}" target="_blank" rel="noopener">${esc(d.title)}</a></div></div>`;
+}
+
+function renderDisc() {
+  if (!kr) return;
+  const list = kr.disc.items.filter(d => (dc.mkt === "all" || d.m === dc.mkt) && (dc.cat === "all" || d.cat === dc.cat));
+  $("#dc-count").textContent = list.length + "건";
+  const day = kr.disc.day, today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  $("#dc-day").textContent = `DART · ${day ? day.slice(5).replace("-", "/") : ""}${day && day !== today ? " (최근 공시일)" : ""}`;
+  $("#dc-list").innerHTML = list.length
+    ? list.slice(0, dc.shown).map(discRow).join("") + (list.length > dc.shown ? `<button class="more" id="dc-more">더 보기 (${list.length - dc.shown}건 남음)</button>` : "")
+    : `<div class="err" style="padding:24px 0">해당 공시가 없어요</div>`;
+  $("#dc-more")?.addEventListener("click", () => { dc.shown += 30; renderDisc(); });
+}
+
+$("#dc-list").addEventListener("click", e => {
+  const b = e.target.closest("button.co");
+  if (!b) return;
+  const r = stockByName.get(normName(b.dataset.nm));
+  if (r) { openStock(r[0]); $("#sq").closest("section").scrollIntoView({behavior: "smooth", block: "start"}); }
+});
+
+function stockLine(r) {
+  return `<a href="#" data-code="${r[0]}"><div class="n">${esc(r[1])}<span class="mk">${r[2] ? "코스닥" : "코스피"}</span>
+      <small>${r[0]} · 시총 ${capTxt(r[5])}</small></div>
+    <div class="r"><b>${won(r[3])}</b><span class="${dir(r[4])}">${pctTxt(r[4])}</span></div></a>`;
+}
+
+function searchStocks() {
+  if (!stockRows) return;
+  const q = normName($("#sq").value);
+  const body = $("#sq-body");
+  sqCode = null;
+  if (!q) {
+    body.innerHTML = `<div class="sq-note">시가총액 상위 10</div><div class="nh">${stockRows.slice(0, 10).map(stockLine).join("")}</div>`;
+    return;
+  }
+  const hit = [];
+  for (const r of stockRows) {
+    const n = normName(r[1]);
+    const score = r[0] === q || n === q ? 0 : n.startsWith(q) || r[0].startsWith(q) ? 1 : n.includes(q) ? 2 : -1;
+    if (score >= 0) hit.push([score, r]);
+  }
+  hit.sort((a, b) => a[0] - b[0]);  // 같은 점수 안에서는 시총 순서 유지
+  body.innerHTML = hit.length
+    ? `<div class="sq-note">${hit.length}종목${hit.length > 30 ? " · 상위 30개만 표시" : ""}</div><div class="nh">${hit.slice(0, 30).map(h => stockLine(h[1])).join("")}</div>`
+    : `<div class="err" style="padding:24px 0">‘${esc($("#sq").value)}’에 맞는 종목이 없어요</div>`;
+}
+
+const CHART_IMG = {"당일": "area/day", "일봉": "candle/day", "주봉": "candle/week", "월봉": "candle/month", "1년": "area/year"};
+let sdChart = "일봉";
+
+function openStock(code) {
+  const r = stockRows?.find(x => x[0] === code);
+  if (!r) return;
+  sqCode = code;
+  const [c, nm, mk, px, pct, cap, amt, per, pbr, hi, lo, frgn] = r;
+  const disc = kr ? kr.disc.items.filter(d => normName(d.nm) === normName(nm)) : [];
+  const bust = Math.floor(Date.now() / 900000);  // 15분마다 차트 이미지 새로
+  const stat = (k, v) => `<div><small>${k}</small><b>${v}</b></div>`;
+  $("#sq-body").innerHTML = `<button class="back" id="sd-back">← 목록</button>
+    <div class="sd-head"><h3>${esc(nm)}</h3><small>${c} · ${mk ? "코스닥" : "코스피"}</small>
+      <div class="px"><b>${won(px)}</b><span class="${dir(pct)}">${arrow(pct)} ${pctTxt(pct)}</span></div></div>
+    <div class="filters" id="sd-chart">${Object.keys(CHART_IMG).map(k => `<button data-v="${k}" class="${k === sdChart ? "on" : ""}">${k}</button>`).join("")}</div>
+    <img class="simg" id="sd-img" alt="${esc(nm)} ${sdChart} 차트" src="https://ssl.pstatic.net/imgfinance/chart/item/${CHART_IMG[sdChart]}/${c}.png?t=${bust}">
+    <div class="stats">${stat("시가총액", capTxt(cap))}${stat("거래대금", capTxt(amt))}${stat("PER", per == null ? "-" : per.toFixed(2) + "배")}
+      ${stat("PBR", pbr == null ? "-" : pbr.toFixed(2) + "배")}${stat("52주 최고", won(hi))}${stat("52주 최저", won(lo))}${stat("외국인 비율", frgn == null ? "-" : frgn.toFixed(1) + "%")}</div>
+    <div class="sub2">오늘 공시 ${disc.length ? disc.length + "건" : ""}</div>
+    <div class="dc">${disc.length ? disc.map(discRow).join("") : `<div class="err" style="padding:8px 0">오늘 올라온 공시가 없어요</div>`}</div>
+    <div class="links"><a href="https://m.stock.naver.com/domestic/stock/${c}/total" target="_blank" rel="noopener">네이버 증권 ↗</a>
+      <a href="https://dart.fss.or.kr/dsab007/main.do?textCrpNm=${encodeURIComponent(nm)}" target="_blank" rel="noopener">DART 전체 공시 ↗</a></div>`;
+  $("#sd-back").onclick = () => searchStocks();
+  document.querySelectorAll("#sd-chart button").forEach(b => b.onclick = () => {
+    document.querySelectorAll("#sd-chart button").forEach(x => x.classList.toggle("on", x === b));
+    sdChart = b.dataset.v;
+    $("#sd-img").src = `https://ssl.pstatic.net/imgfinance/chart/item/${CHART_IMG[sdChart]}/${c}.png?t=${bust}`;
+    $("#sd-img").alt = `${nm} ${sdChart} 차트`;
+  });
+}
+
+$("#sq").addEventListener("input", searchStocks);
+$("#sq").addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+  const first = $("#sq-body a[data-code]");
+  if (first) openStock(first.dataset.code);
+});
+$("#sq-body").addEventListener("click", e => {
+  const a = e.target.closest("a[data-code]");
+  if (!a) return;
+  e.preventDefault();
+  openStock(a.dataset.code);
+});
+
+function krChips(sel, key, conv, after) {
+  document.querySelectorAll(sel + " button").forEach(b => {
+    b.classList.toggle("on", conv(b.dataset.v) === kc[key] || conv(b.dataset.v) === dc[key]);
+    b.onclick = () => {
+      document.querySelectorAll(sel + " button").forEach(x => x.classList.toggle("on", x === b));
+      after(conv(b.dataset.v));
+    };
+  });
+}
+krChips("#kc-idx", "idx", v => v, v => { kc.idx = v; try { localStorage.setItem("kcIdx", v); } catch (e) {} renderKrChart(); });
+krChips("#kc-range", "range", Number, v => { kc.range = v; try { localStorage.setItem("kcRange", v); } catch (e) {} renderKrChart(); });
+krChips("#dc-mkt", "mkt", v => v, v => { dc.mkt = v; dc.shown = 20; renderDisc(); });
+krChips("#dc-cat", "cat", v => v, v => { dc.cat = v; dc.shown = 20; renderDisc(); });
+
+async function loadKr(force) {
+  const jobs = [];
+  if (force || !kr || Date.now() - krAt > 300000) jobs.push(fetch("data/kr.json", {cache: "no-store"}).then(r => r.json()).then(d => {
+    kr = d; krAt = Date.now();
+  }).catch(() => {
+    if (!kr) { $("#kc-chart").innerHTML = $("#dc-list").innerHTML = `<div class="err" style="padding:24px 0">불러오기 실패 · 다시 시도 중</div>`; }
+  }));
+  if (!stockRows || Date.now() - stockAt > 600000) jobs.push(fetch("data/stocks.json", {cache: "no-store"}).then(r => r.json()).then(d => {
+    stockRows = d.rows; stockAt = Date.now();
+    stockByName = new Map(stockRows.map(r => [normName(r[1]), r]));
+    $("#sq-info").textContent = `${stockRows.length.toLocaleString("ko-KR")}종목`;
+  }).catch(() => {
+    if (!stockRows) $("#sq-body").innerHTML = `<div class="err" style="padding:24px 0">종목 목록을 불러오지 못했어요</div>`;
+  }));
+  if (!jobs.length) return;
+  await Promise.all(jobs);
+  renderKrChart();
+  renderDisc();
+  // 상세를 보고 있으면 새 시세로 다시 그리고, 아니면 목록 갱신
+  if (stockRows) sqCode ? openStock(sqCode) : searchStocks();
+}
+
 // 뉴스 탭
 let news = null, newsKind = "all";
 const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
@@ -437,12 +672,14 @@ function tileHTML(s, i, rate) {
     <div class="tv">${last ? num2(last[1], rate ? 3 : 2) : "-"}<small class="${dir(diff)}">${arrow(diff)} ${chg}</small></div></div>`;
 }
 
-function lineChart(box, series, rate) {
+function lineChart(box, series, rate, opt = {}) {
   const W = Math.max(box.clientWidth, 280), H = W < 500 ? 190 : 230;
   const pad = {l: 8, r: 44, t: 10, b: 22};
-  const dates = [...new Set(series.flatMap(s => s.points.map(p => p[0])))].sort();
+  const dates = opt.domain || [...new Set(series.flatMap(s => s.points.map(p => p[0])))].sort();
+  const axisLabel = opt.label || (d => d.slice(2).replace(/-/g, ".")), tipLabel = opt.label || (d => d.replace(/-/g, "."));
+  const color = (s, i) => s.color || COLORS[i];
   if (dates.length < 2) { box.innerHTML = `<div class="err">데이터가 부족해요</div>`; return; }
-  const vals = series.flatMap(s => s.points.map(p => p[1]));
+  const vals = series.flatMap(s => s.points.map(p => p[1])).concat(opt.ref != null ? [opt.ref] : []);
   let lo = Math.min(...vals), hi = Math.max(...vals);
   const padv = (hi - lo) * 0.08 || 1; lo -= padv; hi += padv;
   const x = d => pad.l + dates.indexOf(d) / (dates.length - 1) * (W - pad.l - pad.r);
@@ -452,12 +689,14 @@ function lineChart(box, series, rate) {
   const grid = ticks.map(t => `<line x1="${pad.l}" x2="${W - pad.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)"/>
     <text x="${W - pad.r + 6}" y="${y(t) + 4}">${num2(t, rate || hi - lo < 20 ? (rate ? 2 : 1) : 0)}</text>`).join("");
   const xi = [0, Math.floor((dates.length - 1) / 2), dates.length - 1];
-  const xl = xi.map((i, k) => `<text x="${x(dates[i])}" y="${H - 4}" text-anchor="${["start", "middle", "end"][k]}">${dates[i].slice(2).replace(/-/g, ".")}</text>`).join("");
-  const lines = series.map((s, i) => `<polyline fill="none" stroke="${COLORS[i]}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+  const xl = xi.map((i, k) => `<text x="${x(dates[i])}" y="${H - 4}" text-anchor="${["start", "middle", "end"][k]}">${axisLabel(dates[i])}</text>`).join("");
+  const ref = opt.ref == null ? "" : `<line x1="${pad.l}" x2="${W - pad.r}" y1="${y(opt.ref)}" y2="${y(opt.ref)}" stroke="var(--axis)" stroke-dasharray="4 4"/>
+    <text x="${pad.l + 2}" y="${y(opt.ref) - 4}">전일 ${num2(opt.ref, 2)}</text>`;
+  const lines = series.map((s, i) => `<polyline fill="none" stroke="${color(s, i)}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
     points="${s.points.map(p => `${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join(" ")}"/>`).join("");
-  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}">${grid}${xl}${lines}
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}">${grid}${ref}${xl}${lines}
     <g class="hover" style="display:none"><line class="cx" y1="${pad.t}" y2="${H - pad.b}" stroke="var(--axis)" stroke-dasharray="3 3"/>
-    ${series.map((s, i) => `<circle r="4.5" fill="${COLORS[i]}" stroke="var(--card)" stroke-width="2"/>`).join("")}</g>
+    ${series.map((s, i) => `<circle r="4.5" fill="${color(s, i)}" stroke="var(--card)" stroke-width="2"/>`).join("")}</g>
     <rect x="${pad.l}" y="0" width="${W - pad.l - pad.r}" height="${H}" fill="transparent" style="touch-action:pan-y"/></svg>
     <div class="tip"></div>`;
   const svg = box.querySelector("svg"), g = box.querySelector(".hover"), tip = box.querySelector(".tip");
@@ -471,9 +710,9 @@ function lineChart(box, series, rate) {
     const rows = series.map((s, k) => {
       const v = valueAt(s, d), c = g.querySelectorAll("circle")[k];
       c.style.display = v == null ? "none" : ""; if (v != null) { c.setAttribute("cx", cx); c.setAttribute("cy", y(v)); }
-      return `<div><span><i style="background:${COLORS[k]}"></i>${s.name}</span><span>${v == null ? "-" : num2(v, rate ? 3 : 2)}</span></div>`;
+      return `<div><span><i style="background:${color(s, k)}"></i>${s.name}</span><span>${v == null ? "-" : num2(v, rate ? 3 : 2)}</span></div>`;
     }).join("");
-    tip.innerHTML = `<b>${d.replace(/-/g, ".")}</b>${rows}`;
+    tip.innerHTML = `<b>${tipLabel(d)}</b>${rows}`;
     tip.style.display = "block";
     const left = cx * r.width / W, tw = tip.offsetWidth;
     tip.style.left = (left + 12 + tw > r.width ? left - tw - 12 : left + 12) + "px";
@@ -515,7 +754,7 @@ document.querySelectorAll("#mc-range button").forEach(b => {
     renderMacro();
   };
 });
-let rsz; addEventListener("resize", () => { clearTimeout(rsz); rsz = setTimeout(() => { if (!$("#tab-macro").hidden) renderMacro(); }, 150); });
+let rsz; addEventListener("resize", () => { clearTimeout(rsz); rsz = setTimeout(() => { if (!$("#tab-macro").hidden) renderMacro(); if (!$("#tab-kr").hidden) renderKrChart(); }, 150); });
 
 // 추정치 탭
 let est = null, estAt = 0;
@@ -618,7 +857,8 @@ bindChips("#es-market", "market", v => v);
 
 try { const t = localStorage.getItem("tab"); if (t) document.querySelector(`#tabs [data-tab="${t}"]`)?.click(); } catch (e) {}
 load();
-setInterval(() => { load(); if (!$("#tab-newhigh").hidden) loadHighs(); if (!$("#tab-news").hidden) loadNews(); }, 60000);
+if (!$("#tab-kr").hidden) loadKr();
+setInterval(() => { load(); if (!$("#tab-kr").hidden) loadKr(); if (!$("#tab-newhigh").hidden) loadHighs(); if (!$("#tab-news").hidden) loadNews(); }, 60000);
 </script>
 </body>
 </html>
